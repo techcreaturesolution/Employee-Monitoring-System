@@ -1,0 +1,25 @@
+{
+  "name": "ems-desktop-agent",
+  "version": "1.0.0",
+  "description": "Employee Monitoring System - Desktop Agent",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "form-data": "^4.0.0",
+    "node-cron": "^3.0.3",
+    "screenshot-desktop": "^1.15.0",
+    "active-win": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "@types/node-cron": "^3.0.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  }
+}
