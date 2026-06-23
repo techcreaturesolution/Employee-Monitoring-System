@@ -48,3 +48,32 @@ export const paginate = (page: number, limit: number) => {
   const skip = (page - 1) * limit;
   return { skip, limit: Math.min(limit, 100) };
 };
+
+export const haversineDistance = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number => {
+  const R = 6371000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+export const isInsideGeofence = (
+  lat: number,
+  lon: number,
+  officeLocations: Array<{ latitude: number; longitude: number; radiusMeters: number }>
+): boolean => {
+  for (const office of officeLocations) {
+    const distance = haversineDistance(lat, lon, office.latitude, office.longitude);
+    if (distance <= office.radiusMeters) return true;
+  }
+  return false;
+};

@@ -93,4 +93,11 @@ export const tenantAPI = {
   delete: (id: string) => api.delete(`/tenants/${id}`),
 };
 
+export const locationAPI = {
+  getLive: () => api.get('/location/live'),
+  getHistory: (params?: Record<string, string | number>) => api.get('/location/history', { params }),
+  getTrail: (params: { userId: string; date: string }) => api.get('/location/trail', { params }),
+  checkGeofence: (data: { latitude: number; longitude: number }) => api.post('/location/geofence-check', data),
+};
+
 export default api;

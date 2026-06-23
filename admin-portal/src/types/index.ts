@@ -10,9 +10,16 @@ export interface User {
   phone: string;
   employeeId: string;
   status: 'active' | 'inactive' | 'suspended';
+  workMode: 'office' | 'wfh' | 'field';
   agentKey: string;
   lastActive: string;
   isOnline: boolean;
+  lastKnownLocation?: {
+    latitude: number;
+    longitude: number;
+    address: string;
+    updatedAt: string;
+  };
 }
 
 export interface Tenant {
@@ -36,6 +43,17 @@ export interface TenantSettings {
   allowManualPunch: boolean;
   autoStopTracking: boolean;
   idleTimeThreshold: number;
+  enableGeofencing: boolean;
+  officeLocations: OfficeLocation[];
+  mobileLocationInterval: number;
+  requireLocationForPunch: boolean;
+}
+
+export interface OfficeLocation {
+  name: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
 }
 
 export interface Attendance {
@@ -43,6 +61,7 @@ export interface Attendance {
   userId: User | string;
   tenantId: string;
   date: string;
+  workMode: 'office' | 'wfh' | 'field';
   punchIn: PunchRecord;
   punchOut: PunchRecord;
   breaks: Break[];
@@ -55,9 +74,10 @@ export interface Attendance {
 export interface PunchRecord {
   time: string;
   ip: string;
-  location: { latitude: number; longitude: number; address: string };
+  location: { latitude: number; longitude: number; address: string; accuracy: number };
   screenshotUrl: string;
   method: string;
+  isInsideGeofence: boolean;
 }
 
 export interface Break {
@@ -115,6 +135,38 @@ export interface Pagination {
   page: number;
   limit: number;
   pages: number;
+}
+
+export interface LocationLog {
+  _id: string;
+  userId: User | string;
+  tenantId: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  address: string;
+  source: 'mobile' | 'web' | 'agent';
+  workMode: 'office' | 'wfh' | 'field';
+  isInsideGeofence: boolean;
+  batteryLevel: number;
+  networkType: string;
+  timestamp: string;
+}
+
+export interface LiveEmployeeLocation {
+  userId: string;
+  name: string;
+  email: string;
+  department: string;
+  workMode: 'office' | 'wfh' | 'field';
+  location: {
+    latitude: number;
+    longitude: number;
+    address: string;
+    updatedAt: string;
+  };
+  isOnline: boolean;
+  lastActive: string;
 }
 
 export interface ApiResponse<T> {

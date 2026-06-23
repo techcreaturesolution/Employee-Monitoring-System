@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { attendanceAPI } from '../services/api';
 import { Attendance as AttendanceType } from '../types';
-import { Clock, LogIn, LogOut, Coffee, Play, Pause } from 'lucide-react';
+import { Clock, LogIn, LogOut, Coffee, Play, MapPin, Building2, Home, Briefcase } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 const Attendance: React.FC = () => {
@@ -33,10 +33,28 @@ const Attendance: React.FC = () => {
     fetchData();
   }, []);
 
+  const getGeoLocation = (): Promise<{ latitude: number; longitude: number } | null> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    });
+  };
+
   const handlePunchIn = async () => {
     setPunching(true);
     try {
-      await attendanceAPI.punchIn({ method: 'web' });
+      const geo = await getGeoLocation();
+      await attendanceAPI.punchIn({
+        method: 'web',
+        location: geo ? { latitude: geo.latitude, longitude: geo.longitude, address: '', accuracy: 0 } : undefined,
+      });
       toast.success('Punched In!');
       fetchData();
     } catch (error) {
@@ -50,7 +68,11 @@ const Attendance: React.FC = () => {
   const handlePunchOut = async () => {
     setPunching(true);
     try {
-      await attendanceAPI.punchOut({ method: 'web' });
+      const geo = await getGeoLocation();
+      await attendanceAPI.punchOut({
+        method: 'web',
+        location: geo ? { latitude: geo.latitude, longitude: geo.longitude, address: '', accuracy: 0 } : undefined,
+      });
       toast.success('Punched Out!');
       fetchData();
     } catch (error) {
@@ -131,6 +153,36 @@ const Attendance: React.FC = () => {
               <span className="text-sm text-slate-500">Breaks</span>
               <span className="font-medium">{formatMinutes(todayAttendance?.totalBreakMinutes || 0)}</span>
             </div>
+            <div className="flex justify-between items-center py-2 border-b">
+              <span className="text-sm text-slate-500">Work Mode</span>
+              <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                todayAttendance?.workMode === 'office' ? 'bg-blue-100 text-blue-700' :
+                todayAttendance?.workMode === 'wfh' ? 'bg-green-100 text-green-700' :
+                todayAttendance?.workMode === 'field' ? 'bg-orange-100 text-orange-700' :
+                'bg-slate-100 text-slate-500'
+              }`}>
+                {todayAttendance?.workMode === 'office' && <Building2 className="w-3 h-3" />}
+                {todayAttendance?.workMode === 'wfh' && <Home className="w-3 h-3" />}
+                {todayAttendance?.workMode === 'field' && <Briefcase className="w-3 h-3" />}
+                {todayAttendance?.workMode || 'N/A'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b">
+              <span className="text-sm text-slate-500">Location</span>
+              {todayAttendance?.punchIn?.location?.latitude ? (
+                <a
+                  href={`https://www.google.com/maps?q=${todayAttendance.punchIn.location.latitude},${todayAttendance.punchIn.location.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                >
+                  <MapPin className="w-3 h-3" />
+                  {todayAttendance.punchIn.location.address || 'View on Map'}
+                </a>
+              ) : (
+                <span className="text-xs text-slate-400">No location</span>
+              )}
+            </div>
             <div className="flex justify-between items-center py-2">
               <span className="text-sm text-slate-500">Status</span>
               <span className={`text-xs px-2 py-1 rounded-full ${
@@ -198,6 +250,7 @@ const Attendance: React.FC = () => {
                   {isAdmin && <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase">Employee</th>}
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase">Punch In</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase">Punch Out</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase">Work Mode</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase">Work Hours</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase">Status</th>
                 </tr>
@@ -211,8 +264,42 @@ const Attendance: React.FC = () => {
                         {typeof record.userId === 'object' ? (record.userId as unknown as { name: string }).name : '-'}
                       </td>
                     )}
-                    <td className="px-4 py-3 text-sm">{record.punchIn?.time ? formatTime(record.punchIn.time) : '-'}</td>
-                    <td className="px-4 py-3 text-sm">{record.punchOut?.time ? formatTime(record.punchOut.time) : '-'}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <div>{record.punchIn?.time ? formatTime(record.punchIn.time) : '-'}</div>
+                      {record.punchIn?.location?.latitude > 0 && (
+                        <a
+                          href={`https://www.google.com/maps?q=${record.punchIn.location.latitude},${record.punchIn.location.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-0.5 text-xs text-blue-500 hover:underline mt-0.5"
+                        >
+                          <MapPin className="w-2.5 h-2.5" /> Map
+                        </a>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <div>{record.punchOut?.time ? formatTime(record.punchOut.time) : '-'}</div>
+                      {record.punchOut?.location?.latitude > 0 && (
+                        <a
+                          href={`https://www.google.com/maps?q=${record.punchOut.location.latitude},${record.punchOut.location.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-0.5 text-xs text-blue-500 hover:underline mt-0.5"
+                        >
+                          <MapPin className="w-2.5 h-2.5" /> Map
+                        </a>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        record.workMode === 'office' ? 'bg-blue-100 text-blue-700' :
+                        record.workMode === 'wfh' ? 'bg-green-100 text-green-700' :
+                        record.workMode === 'field' ? 'bg-orange-100 text-orange-700' :
+                        'bg-slate-100 text-slate-500'
+                      }`}>
+                        {record.workMode || 'office'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-sm font-medium">{formatMinutes(record.totalWorkMinutes || 0)}</td>
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-1 rounded-full ${
@@ -227,7 +314,7 @@ const Attendance: React.FC = () => {
                   </tr>
                 ))}
                 {history.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No attendance records yet</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">No attendance records yet</td></tr>
                 )}
               </tbody>
             </table>

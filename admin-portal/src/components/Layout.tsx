@@ -15,6 +15,7 @@ import {
   Monitor,
   Bell,
   Building2,
+  MapPin,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -42,6 +43,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/screenshots', label: 'Screenshots', icon: Camera, show: true },
     { path: '/activity', label: 'Activity', icon: Activity, show: true },
     { path: '/projects', label: 'Projects', icon: FolderOpen, show: true },
+    { path: '/location', label: 'Location', icon: MapPin, show: isAdmin },
     { path: '/tenants', label: 'Tenants', icon: Building2, show: isSuperAdmin },
     { path: '/settings', label: 'Settings', icon: Settings, show: isAdmin },
   ];

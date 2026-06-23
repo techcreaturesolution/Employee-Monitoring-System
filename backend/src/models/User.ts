@@ -13,9 +13,16 @@ export interface IUser extends Document {
   avatar: string;
   phone: string;
   status: 'active' | 'inactive' | 'suspended';
+  workMode: 'office' | 'wfh' | 'field';
   agentKey: string;
   lastActive: Date;
   isOnline: boolean;
+  lastKnownLocation: {
+    latitude: number;
+    longitude: number;
+    address: string;
+    updatedAt: Date;
+  };
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -42,9 +49,20 @@ const userSchema = new Schema<IUser>(
       enum: ['active', 'inactive', 'suspended'],
       default: 'active',
     },
+    workMode: {
+      type: String,
+      enum: ['office', 'wfh', 'field'],
+      default: 'office',
+    },
     agentKey: { type: String, unique: true, sparse: true },
     lastActive: { type: Date },
     isOnline: { type: Boolean, default: false },
+    lastKnownLocation: {
+      latitude: { type: Number, default: 0 },
+      longitude: { type: Number, default: 0 },
+      address: { type: String, default: '' },
+      updatedAt: { type: Date },
+    },
   },
   { timestamps: true }
 );

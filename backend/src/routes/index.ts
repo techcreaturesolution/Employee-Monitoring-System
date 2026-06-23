@@ -9,6 +9,8 @@ import projectRoutes from './projectRoutes';
 import settingsRoutes from './settingsRoutes';
 import tenantRoutes from './tenantRoutes';
 import agentRoutes from './agentRoutes';
+import locationRoutes from './locationRoutes';
+import mobileRoutes from './mobileRoutes';
 
 const router = Router();
 
@@ -22,5 +24,7 @@ router.use('/projects', projectRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/tenants', tenantRoutes);
 router.use('/agent', agentRoutes);
+router.use('/location', locationRoutes);
+router.use('/mobile', mobileRoutes);
 
 export default router;

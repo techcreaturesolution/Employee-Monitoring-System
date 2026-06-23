@@ -13,6 +13,7 @@ import ActivityPage from './pages/ActivityPage';
 import Projects from './pages/Projects';
 import SettingsPage from './pages/SettingsPage';
 import Tenants from './pages/Tenants';
+import LocationTracker from './pages/LocationTracker';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -58,6 +59,7 @@ const App: React.FC = () => {
         <Route path="/projects" element={<ProtectedRoute><Projects /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/tenants" element={<ProtectedRoute><Tenants /></ProtectedRoute>} />
+        <Route path="/location" element={<ProtectedRoute><LocationTracker /></ProtectedRoute>} />
 
         <Route path="/" element={<Navigate to="/dashboard" />} />
         <Route path="*" element={<Navigate to="/dashboard" />} />
