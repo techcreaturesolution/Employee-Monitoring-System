@@ -9,12 +9,40 @@ class AuthProvider extends ChangeNotifier {
   TenantConfig? _tenant;
   bool _loading = false;
 
-  AuthProvider({required this.api});
+  AuthProvider({required this.api}) {
+    _tryRestoreSession();
+  }
 
   User? get user => _user;
   TenantConfig? get tenant => _tenant;
   bool get loading => _loading;
   bool get isAuthenticated => _user != null;
+
+  Future<void> _tryRestoreSession() async {
+    _loading = true;
+    notifyListeners();
+
+    try {
+      final hasToken = await api.tryRestoreToken();
+      if (!hasToken) {
+        _loading = false;
+        notifyListeners();
+        return;
+      }
+
+      final result = await api.getProfile();
+      final data = result['data'] as Map<String, dynamic>;
+      _user = User.fromJson(data['user'] as Map<String, dynamic>);
+      _tenant = data['tenant'] != null
+          ? TenantConfig.fromJson(data['tenant'] as Map<String, dynamic>)
+          : null;
+    } catch (_) {
+      await api.clearToken();
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> login(String email, String password) async {
     _loading = true;
@@ -25,7 +53,9 @@ class AuthProvider extends ChangeNotifier {
       final data = result['data'] as Map<String, dynamic>;
 
       _user = User.fromJson(data['user'] as Map<String, dynamic>);
-      _tenant = TenantConfig.fromJson(data['tenant'] as Map<String, dynamic>);
+      _tenant = data['tenant'] != null
+          ? TenantConfig.fromJson(data['tenant'] as Map<String, dynamic>)
+          : null;
 
       final token = data['accessToken']?.toString() ?? '';
       await api.setToken(token);

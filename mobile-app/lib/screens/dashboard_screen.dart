@@ -61,6 +61,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (position != null && mounted) {
       final addr =
           await _locationService.reverseGeocode(position.latitude, position.longitude);
+      if (!mounted) return;
       setState(() => _currentAddress = addr);
 
       final result = await _locationService.sendSingleLocation(position);

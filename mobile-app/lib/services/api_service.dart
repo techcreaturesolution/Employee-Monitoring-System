@@ -43,6 +43,11 @@ class ApiService {
     );
   }
 
+  Future<bool> tryRestoreToken() async {
+    final token = await getToken();
+    return token != null && token.isNotEmpty;
+  }
+
   // Auth
   Future<Map<String, dynamic>> mobileLogin(
       String email, String password) async {
@@ -120,6 +125,15 @@ class ApiService {
   Future<Map<String, dynamic>> getDashboard() async {
     final response = await http.get(
       Uri.parse('$baseUrl/mobile/dashboard'),
+      headers: _headers(),
+    );
+    return _handleResponse(response);
+  }
+
+  // Profile (for token restore)
+  Future<Map<String, dynamic>> getProfile() async {
+    final response = await http.get(
+      Uri.parse('${baseUrl.replaceAll('/mobile', '')}/auth/profile'),
       headers: _headers(),
     );
     return _handleResponse(response);

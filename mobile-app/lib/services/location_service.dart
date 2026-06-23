@@ -4,6 +4,7 @@ import 'package:geocoding/geocoding.dart';
 import 'api_service.dart';
 
 class LocationService {
+  static const int _maxBufferSize = 100;
   final ApiService _api;
   StreamSubscription<Position>? _positionSubscription;
   final List<Map<String, dynamic>> _locationBuffer = [];
@@ -111,8 +112,11 @@ class LocationService {
     try {
       await _api.batchTrackLocations(batch);
     } catch (e) {
-      // Re-add on failure for retry
+      // Re-add on failure, but cap to prevent unbounded growth
       _locationBuffer.addAll(batch);
+      if (_locationBuffer.length > _maxBufferSize) {
+        _locationBuffer.removeRange(0, _locationBuffer.length - _maxBufferSize);
+      }
     }
   }
 
