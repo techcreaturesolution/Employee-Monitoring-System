@@ -6,3 +6,4 @@ export { ActivityLog, IActivityLog } from './ActivityLog';
 export { Project, IProject } from './Project';
 export { Subscription, ISubscription } from './Subscription';
 export { Notification, INotification } from './Notification';
+export { LocationLog, ILocationLog } from './LocationLog';

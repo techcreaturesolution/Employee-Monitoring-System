@@ -106,7 +106,7 @@ export const updateEmployee = async (req: AuthRequest, res: Response): Promise<v
     const { id } = req.params;
     const tenantId = req.user?.tenantId;
 
-    const allowedUpdates = ['name', 'department', 'designation', 'phone', 'status', 'role', 'employeeId'];
+    const allowedUpdates = ['name', 'department', 'designation', 'phone', 'status', 'role', 'employeeId', 'workMode'];
     const updates: Record<string, unknown> = {};
     for (const key of allowedUpdates) {
       if (req.body[key] !== undefined) {

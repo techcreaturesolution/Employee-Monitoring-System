@@ -148,6 +148,7 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
           avatar: user.avatar,
           phone: user.phone,
           employeeId: user.employeeId,
+          workMode: user.workMode,
           agentKey: user.agentKey,
           lastActive: user.lastActive,
           isOnline: user.isOnline,

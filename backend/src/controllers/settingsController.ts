@@ -55,6 +55,8 @@ export const updateSettings = async (req: AuthRequest, res: Response): Promise<v
         'screenshotInterval', 'trackApps', 'trackUrls', 'blurScreenshots',
         'workStartTime', 'workEndTime', 'timezone', 'allowManualPunch',
         'autoStopTracking', 'idleTimeThreshold',
+        'enableGeofencing', 'officeLocations', 'mobileLocationInterval',
+        'requireLocationForPunch',
       ];
 
       for (const key of allowedSettings) {
