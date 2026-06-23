@@ -1,0 +1,19 @@
+{
+  "name": "employee-monitoring-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Employee Desktop Monitoring SaaS Platform",
+  "scripts": {
+    "install:all": "cd backend && npm install && cd ../admin-portal && npm install && cd ../desktop-agent && npm install",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd admin-portal && npm run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd admin-portal && npm run build",
+    "build": "npm run build:backend && npm run build:frontend",
+    "lint": "cd backend && npm run lint && cd ../admin-portal && npm run lint"
+  },
+  "keywords": ["employee-monitoring", "saas", "time-tracking", "screenshot", "attendance"],
+  "author": "Tech Creature Solution",
+  "license": "MIT"
+}
