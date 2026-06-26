@@ -109,6 +109,10 @@ export const agentPunchIn = async (req: AuthRequest, res: Response): Promise<voi
       location: req.body.location || { latitude: 0, longitude: 0, address: '' },
       screenshotUrl: req.body.screenshotUrl || '',
       method: 'agent',
+      location: req.body.location || { latitude: 0, longitude: 0, address: '', accuracy: 0 },
+      screenshotUrl: req.body.screenshotUrl || '',
+      method: 'agent',
+      isInsideGeofence: false,
     };
     attendance.status = 'present';
     await attendance.save();
@@ -136,6 +140,10 @@ export const agentPunchOut = async (req: AuthRequest, res: Response): Promise<vo
       location: req.body.location || { latitude: 0, longitude: 0, address: '' },
       screenshotUrl: req.body.screenshotUrl || '',
       method: 'agent',
+      location: req.body.location || { latitude: 0, longitude: 0, address: '', accuracy: 0 },
+      screenshotUrl: req.body.screenshotUrl || '',
+      method: 'agent',
+      isInsideGeofence: false,
     };
 
     const totalBreak = attendance.breaks.reduce((sum, b) => sum + (b.duration || 0), 0);

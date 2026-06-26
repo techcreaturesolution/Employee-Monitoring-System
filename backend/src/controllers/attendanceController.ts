@@ -24,6 +24,17 @@ export const punchIn = async (req: AuthRequest, res: Response): Promise<void> =>
       location: location || { latitude: 0, longitude: 0, address: '' },
       screenshotUrl: screenshotUrl || '',
       method: method || 'web',
+    const { ip, location, screenshotUrl, method, workMode } = req.body;
+
+    const attendance = existing || new Attendance({ userId, tenantId, date: today });
+    attendance.workMode = workMode || req.user?.workMode || 'office';
+    attendance.punchIn = {
+      time: new Date(),
+      ip: ip || req.ip || '',
+      location: location || { latitude: 0, longitude: 0, address: '', accuracy: 0 },
+      screenshotUrl: screenshotUrl || '',
+      method: method || 'web',
+      isInsideGeofence: false,
     };
     attendance.status = 'present';
     await attendance.save();
@@ -57,6 +68,10 @@ export const punchOut = async (req: AuthRequest, res: Response): Promise<void> =
       location: location || { latitude: 0, longitude: 0, address: '' },
       screenshotUrl: screenshotUrl || '',
       method: method || 'web',
+      location: location || { latitude: 0, longitude: 0, address: '', accuracy: 0 },
+      screenshotUrl: screenshotUrl || '',
+      method: method || 'web',
+      isInsideGeofence: false,
     };
 
     const totalBreak = attendance.breaks.reduce((sum, b) => sum + (b.duration || 0), 0);

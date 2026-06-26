@@ -17,12 +17,18 @@ export interface IPunchRecord {
   };
   screenshotUrl: string;
   method: 'agent' | 'web' | 'manual';
+    accuracy: number;
+  };
+  screenshotUrl: string;
+  method: 'agent' | 'web' | 'manual' | 'mobile';
+  isInsideGeofence: boolean;
 }
 
 export interface IAttendance extends Document {
   userId: mongoose.Types.ObjectId;
   tenantId: mongoose.Types.ObjectId;
   date: string;
+  workMode: 'office' | 'wfh' | 'field';
   punchIn: IPunchRecord;
   punchOut: IPunchRecord;
   breaks: IBreak[];
@@ -44,6 +50,7 @@ const punchRecordSchema = new Schema<IPunchRecord>(
       latitude: { type: Number, default: 0 },
       longitude: { type: Number, default: 0 },
       address: { type: String, default: '' },
+      accuracy: { type: Number, default: 0 },
     },
     screenshotUrl: { type: String, default: '' },
     method: {
@@ -51,6 +58,10 @@ const punchRecordSchema = new Schema<IPunchRecord>(
       enum: ['agent', 'web', 'manual'],
       default: 'web',
     },
+      enum: ['agent', 'web', 'manual', 'mobile'],
+      default: 'web',
+    },
+    isInsideGeofence: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -70,6 +81,11 @@ const attendanceSchema = new Schema<IAttendance>(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
     date: { type: String, required: true },
+    workMode: {
+      type: String,
+      enum: ['office', 'wfh', 'field'],
+      default: 'office',
+    },
     punchIn: { type: punchRecordSchema },
     punchOut: { type: punchRecordSchema },
     breaks: [breakSchema],

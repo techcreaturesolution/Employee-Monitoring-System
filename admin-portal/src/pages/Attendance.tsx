@@ -133,11 +133,10 @@ const Attendance: React.FC = () => {
             </div>
             <div className="flex justify-between items-center py-2">
               <span className="text-sm text-slate-500">Status</span>
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                todayAttendance?.status === 'present' ? 'bg-green-100 text-green-700' :
+              <span className={`text-xs px-2 py-1 rounded-full ${todayAttendance?.status === 'present' ? 'bg-green-100 text-green-700' :
                 todayAttendance?.status === 'late' ? 'bg-yellow-100 text-yellow-700' :
-                'bg-slate-100 text-slate-500'
-              }`}>
+                  'bg-slate-100 text-slate-500'
+                }`}>
                 {todayAttendance?.status || 'Not Punched In'}
               </span>
             </div>
@@ -215,12 +214,11 @@ const Attendance: React.FC = () => {
                     <td className="px-4 py-3 text-sm">{record.punchOut?.time ? formatTime(record.punchOut.time) : '-'}</td>
                     <td className="px-4 py-3 text-sm font-medium">{formatMinutes(record.totalWorkMinutes || 0)}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        record.status === 'present' ? 'bg-green-100 text-green-700' :
+                      <span className={`text-xs px-2 py-1 rounded-full ${record.status === 'present' ? 'bg-green-100 text-green-700' :
                         record.status === 'late' ? 'bg-yellow-100 text-yellow-700' :
-                        record.status === 'half-day' ? 'bg-orange-100 text-orange-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
+                          record.status === 'half-day' ? 'bg-orange-100 text-orange-700' :
+                            'bg-red-100 text-red-700'
+                        }`}>
                         {record.status}
                       </span>
                     </td>

@@ -213,6 +213,16 @@ A multi-tenant SaaS platform enabling companies to monitor employee desktop/lapt
 | **Data Retention**     | 7 days   | 30 days  | 90 days  | 365 days |
 | **Support**            | Community | Email | Priority | Dedicated |
 | **Price (₹/mo)**        | 0 | 999 | 2,999 | 9,999 |
+| Feature | Free | Starter | Business | Enterprise |
+|---------|------|---------|----------|------------|
+| Employees | 5 | 25 | 100 | Unlimited |
+| Screenshots | 50/day | 500/day | 2000/day | Unlimited |
+| Screenshot Interval | 30 min | 10 min | 5 min | 1 min |
+| Activity Tracking | Basic | Full | Full | Full |
+| Reports | Basic | Advanced | Advanced | Custom |
+| Data Retention | 7 days | 30 days | 90 days | 365 days |
+| Support | Community | Email | Priority | Dedicated |
+| Price (₹/mo) | 0 | 999 | 2,999 | 9,999 |
 
 ---
 
