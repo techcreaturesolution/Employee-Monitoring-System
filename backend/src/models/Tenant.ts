@@ -59,7 +59,7 @@ const tenantSchema = new Schema<ITenant>(
       default: 'trial',
     },
     settings: {
-      screenshotInterval: { type: Number, default: 10 },
+      screenshotInterval: { type: Number, default: 2 },
       trackApps: { type: Boolean, default: true },
       trackUrls: { type: Boolean, default: true },
       blurScreenshots: { type: Boolean, default: false },

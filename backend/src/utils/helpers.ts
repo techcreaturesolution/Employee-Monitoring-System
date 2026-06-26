@@ -37,7 +37,7 @@ export const calculateWorkMinutes = (punchIn: Date, punchOut: Date): number => {
 export const getPlanLimits = (plan: string) => {
   const limits: Record<string, { maxEmployees: number; maxScreenshotsPerDay: number; screenshotInterval: number; dataRetentionDays: number }> = {
     free: { maxEmployees: 5, maxScreenshotsPerDay: 50, screenshotInterval: 30, dataRetentionDays: 7 },
-    starter: { maxEmployees: 25, maxScreenshotsPerDay: 500, screenshotInterval: 10, dataRetentionDays: 30 },
+    starter: { maxEmployees: 25, maxScreenshotsPerDay: 500, screenshotInterval: 2, dataRetentionDays: 30 },
     business: { maxEmployees: 100, maxScreenshotsPerDay: 2000, screenshotInterval: 5, dataRetentionDays: 90 },
     enterprise: { maxEmployees: 9999, maxScreenshotsPerDay: 99999, screenshotInterval: 1, dataRetentionDays: 365 },
   };
