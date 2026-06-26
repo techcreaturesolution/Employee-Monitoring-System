@@ -6,7 +6,7 @@ import toast, { Toaster } from 'react-hot-toast';
 const SettingsPage: React.FC = () => {
   const [company, setCompany] = useState({ name: '', email: '', phone: '', domain: '' });
   const [monitoring, setMonitoring] = useState({
-    screenshotInterval: 10,
+    screenshotInterval: 2,
     trackApps: true,
     trackUrls: true,
     blurScreenshots: false,
@@ -130,14 +130,12 @@ const SettingsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setMonitoring({ ...monitoring, [item.key]: !monitoring[item.key as keyof typeof monitoring] })}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      monitoring[item.key as keyof typeof monitoring] ? 'bg-blue-600' : 'bg-slate-300'
-                    }`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${monitoring[item.key as keyof typeof monitoring] ? 'bg-blue-600' : 'bg-slate-300'
+                      }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        monitoring[item.key as keyof typeof monitoring] ? 'translate-x-6' : 'translate-x-1'
-                      }`}
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${monitoring[item.key as keyof typeof monitoring] ? 'translate-x-6' : 'translate-x-1'
+                        }`}
                     />
                   </button>
                 </div>
