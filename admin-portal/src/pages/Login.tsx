@@ -19,9 +19,11 @@ const Login: React.FC = () => {
       await login(email, password);
       toast.success('Login successful!');
       navigate('/dashboard');
-    } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } };
-      toast.error(err.response?.data?.message || 'Login failed');
+      return;
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.message || error?.message || 'Login failed';
+      toast.error(errorMessage);
+      return;
     } finally {
       setLoading(false);
     }

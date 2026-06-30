@@ -6,6 +6,8 @@ import {
   agentPunchIn,
   agentPunchOut,
   getAgentConfig,
+  agentSync,
+  getAgentStatus,
 } from '../controllers/agentController';
 import { authenticateAgent } from '../middleware/auth';
 import { uploadScreenshot } from '../middleware/upload';
@@ -19,6 +21,8 @@ router.post('/screenshot', uploadScreenshot.single('screenshot'), agentScreensho
 router.post('/activity', agentLogActivity);
 router.post('/punch-in', agentPunchIn);
 router.post('/punch-out', agentPunchOut);
+router.post('/sync', agentSync);
 router.get('/config', getAgentConfig);
+router.get('/status', getAgentStatus);
 
 export default router;

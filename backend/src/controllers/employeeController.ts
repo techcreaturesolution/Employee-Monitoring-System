@@ -1,9 +1,11 @@
-import { Response } from 'express';
+import { Response, NextFunction } from 'express';
 import { User } from '../models/User';
 import { AuthRequest } from '../middleware/auth';
 import { generateAgentKey, paginate } from '../utils/helpers';
+import crypto from 'crypto';
+import { logger } from '../utils/logger';
 
-export const listEmployees = async (req: AuthRequest, res: Response): Promise<void> => {
+const listEmployees = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const tenantId = req.user?.tenantId;
     const { page = 1, limit = 20, status, department, search } = req.query;
@@ -38,11 +40,12 @@ export const listEmployees = async (req: AuthRequest, res: Response): Promise<vo
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to list employees.', error: (error as Error).message });
+    logger.error('listEmployees failed:', error);
+    next(error);
   }
 };
 
-export const addEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
+const addEmployee = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const tenantId = req.user?.tenantId;
     const { name, email, password, role, department, designation, employeeId, phone } = req.body;
@@ -53,10 +56,14 @@ export const addEmployee = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
+    const tempPassword = crypto.randomBytes(12).toString('base64url');
+    const finalPassword = password || tempPassword;
+
     const employee = await User.create({
       name,
       email,
-      password: password || 'Employee@123',
+      password: finalPassword,
+      mustChangePassword: !password, // force change on first login if no password provided
       role: role || 'employee',
       tenantId,
       department: department || '',
@@ -66,25 +73,32 @@ export const addEmployee = async (req: AuthRequest, res: Response): Promise<void
       agentKey: generateAgentKey(),
     });
 
+    const responseData: any = {
+      id: employee._id,
+      name: employee.name,
+      email: employee.email,
+      role: employee.role,
+      department: employee.department,
+      designation: employee.designation,
+      agentKey: employee.agentKey,
+    };
+
+    if (!password) {
+      responseData.tempPassword = tempPassword; // Send it back to the client once
+    }
+
     res.status(201).json({
       success: true,
       message: 'Employee added successfully.',
-      data: {
-        id: employee._id,
-        name: employee.name,
-        email: employee.email,
-        role: employee.role,
-        department: employee.department,
-        designation: employee.designation,
-        agentKey: employee.agentKey,
-      },
+      data: responseData,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to add employee.', error: (error as Error).message });
+    logger.error('addEmployee failed:', error);
+    next(error);
   }
 };
 
-export const getEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
+const getEmployee = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
     const tenantId = req.user?.tenantId;
@@ -97,16 +111,16 @@ export const getEmployee = async (req: AuthRequest, res: Response): Promise<void
 
     res.json({ success: true, data: employee });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to get employee.', error: (error as Error).message });
+    logger.error('getEmployee failed:', error);
+    next(error);
   }
 };
 
-export const updateEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
+const updateEmployee = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
     const tenantId = req.user?.tenantId;
 
-    const allowedUpdates = ['name', 'department', 'designation', 'phone', 'status', 'role', 'employeeId'];
     const allowedUpdates = ['name', 'department', 'designation', 'phone', 'status', 'role', 'employeeId', 'workMode'];
     const updates: Record<string, unknown> = {};
     for (const key of allowedUpdates) {
@@ -128,11 +142,12 @@ export const updateEmployee = async (req: AuthRequest, res: Response): Promise<v
 
     res.json({ success: true, message: 'Employee updated.', data: employee });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to update employee.', error: (error as Error).message });
+    logger.error('updateEmployee failed:', error);
+    next(error);
   }
 };
 
-export const deleteEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
+const deleteEmployee = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
     const tenantId = req.user?.tenantId;
@@ -150,11 +165,12 @@ export const deleteEmployee = async (req: AuthRequest, res: Response): Promise<v
 
     res.json({ success: true, message: 'Employee deactivated.' });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to delete employee.', error: (error as Error).message });
+    logger.error('deleteEmployee failed:', error);
+    next(error);
   }
 };
 
-export const regenerateAgentKey = async (req: AuthRequest, res: Response): Promise<void> => {
+const regenerateAgentKey = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
     const tenantId = req.user?.tenantId;
@@ -173,6 +189,16 @@ export const regenerateAgentKey = async (req: AuthRequest, res: Response): Promi
 
     res.json({ success: true, message: 'Agent key regenerated.', data: { agentKey: newKey } });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to regenerate key.', error: (error as Error).message });
+    logger.error('regenerateAgentKey failed:', error);
+    next(error);
   }
+};
+
+export {
+  listEmployees,
+  addEmployee,
+  getEmployee,
+  updateEmployee,
+  deleteEmployee,
+  regenerateAgentKey,
 };

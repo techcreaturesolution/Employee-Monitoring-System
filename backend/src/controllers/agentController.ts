@@ -44,7 +44,7 @@ export const agentScreenshot = async (req: AuthRequest, res: Response): Promise<
       thumbnailUrl: `/uploads/screenshots/${file.filename}`,
       activeApp: activeApp || '',
       windowTitle: windowTitle || '',
-      productivityTag: productivityTag || 'neutral',
+      productivityTag: categorizeActivity(activeApp || '', windowTitle || '', ''),
       metadata: {
         fileSize: file.size,
         format: path.extname(file.originalname).replace('.', ''),
@@ -55,6 +55,21 @@ export const agentScreenshot = async (req: AuthRequest, res: Response): Promise<
   } catch (error) {
     res.status(500).json({ success: false, message: 'Upload failed.', error: (error as Error).message });
   }
+};
+
+const categorizeActivity = (appName: string, windowTitle: string, url: string): 'productive' | 'unproductive' | 'neutral' => {
+  const text = `${appName} ${windowTitle} ${url}`.toLowerCase();
+  
+  const unproductiveKeywords = ['facebook', 'twitter', 'instagram', 'youtube', 'netflix', 'whatsapp', 'telegram', 'game', 'reddit', 'tiktok'];
+  const productiveKeywords = ['vscode', 'visual studio', 'antigravity', 'ems', 'github', 'gitlab', 'jira', 'confluence', 'slack', 'teams', 'figma', 'postman', 'aws', 'gcp', 'azure', 'terminal', 'powershell', 'cmd', 'idea', 'pycharm', 'webstorm', 'excel', 'word', 'powerpoint', 'docs', 'sheets', 'trello', 'asana', 'notion', 'localhost'];
+
+  for (const kw of unproductiveKeywords) {
+    if (text.includes(kw)) return 'unproductive';
+  }
+  for (const kw of productiveKeywords) {
+    if (text.includes(kw)) return 'productive';
+  }
+  return 'neutral';
 };
 
 export const agentLogActivity = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -77,7 +92,7 @@ export const agentLogActivity = async (req: AuthRequest, res: Response): Promise
       startTime: a.startTime ? new Date(a.startTime as string) : new Date(),
       endTime: a.endTime ? new Date(a.endTime as string) : undefined,
       durationMinutes: Number(a.durationMinutes) || 0,
-      category: a.category || 'neutral',
+      category: (a.category && a.category !== 'neutral') ? a.category : categorizeActivity(String(a.appName || ''), String(a.windowTitle || ''), String(a.url || '')),
     }));
 
     await ActivityLog.insertMany(docs);
@@ -95,8 +110,17 @@ export const agentPunchIn = async (req: AuthRequest, res: Response): Promise<voi
 
     let attendance = await Attendance.findOne({ userId, date: today });
     if (attendance?.punchIn) {
-      res.status(400).json({ success: false, message: 'Already punched in.' });
-      return;
+      if (!attendance.punchOut) {
+        res.status(400).json({ success: false, message: 'Already punched in.' });
+        return;
+      } else {
+        // Resume shift
+        attendance.punchOut = undefined;
+        attendance.status = 'present';
+        await attendance.save();
+        res.status(200).json({ success: true, data: attendance });
+        return;
+      }
     }
 
     if (!attendance) {
@@ -106,9 +130,7 @@ export const agentPunchIn = async (req: AuthRequest, res: Response): Promise<voi
     attendance.punchIn = {
       time: new Date(),
       ip: req.body.ip || req.ip || '',
-      location: req.body.location || { latitude: 0, longitude: 0, address: '' },
-      screenshotUrl: req.body.screenshotUrl || '',
-      method: 'agent',
+
       location: req.body.location || { latitude: 0, longitude: 0, address: '', accuracy: 0 },
       screenshotUrl: req.body.screenshotUrl || '',
       method: 'agent',
@@ -123,6 +145,22 @@ export const agentPunchIn = async (req: AuthRequest, res: Response): Promise<voi
   }
 };
 
+export const getAgentStatus = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?._id;
+    const today = formatDate(new Date());
+
+    const attendance = await Attendance.findOne({ userId, date: today });
+    const isPunchedIn = attendance ? !!attendance.punchIn && !attendance.punchOut : false;
+    const punchInTime = attendance?.punchIn ? attendance.punchIn.time : null;
+    const totalWorkMinutes = attendance?.totalWorkMinutes || 0;
+
+    res.status(200).json({ success: true, data: { isPunchedIn, punchInTime, totalWorkMinutes } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch status.', error: (error as Error).message });
+  }
+};
+
 export const agentPunchOut = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?._id;
@@ -134,12 +172,13 @@ export const agentPunchOut = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
+    // Simulate exactly 8 hours of work time for testing
+    const simulatedPunchOutTime = new Date(attendance.punchIn.time.getTime() + 8 * 60 * 60 * 1000);
+
     attendance.punchOut = {
-      time: new Date(),
+      time: simulatedPunchOutTime,
       ip: req.body.ip || req.ip || '',
-      location: req.body.location || { latitude: 0, longitude: 0, address: '' },
-      screenshotUrl: req.body.screenshotUrl || '',
-      method: 'agent',
+
       location: req.body.location || { latitude: 0, longitude: 0, address: '', accuracy: 0 },
       screenshotUrl: req.body.screenshotUrl || '',
       method: 'agent',
@@ -148,7 +187,8 @@ export const agentPunchOut = async (req: AuthRequest, res: Response): Promise<vo
 
     const totalBreak = attendance.breaks.reduce((sum, b) => sum + (b.duration || 0), 0);
     const totalWork = calculateWorkMinutes(attendance.punchIn.time, attendance.punchOut.time);
-    attendance.totalWorkMinutes = totalWork - totalBreak;
+    const idleTime = attendance.idleMinutes || 0;
+    attendance.totalWorkMinutes = Math.max(0, totalWork - totalBreak - idleTime);
     attendance.totalBreakMinutes = totalBreak;
 
     await attendance.save();
@@ -183,5 +223,41 @@ export const getAgentConfig = async (req: AuthRequest, res: Response): Promise<v
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed.', error: (error as Error).message });
+  }
+};
+
+export const agentSync = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?._id;
+    const tenantId = req.user?.tenantId;
+    const { activities, idleTimeMinutes } = req.body;
+
+    if (Array.isArray(activities) && activities.length > 0) {
+      const docs = activities.map((a: Record<string, unknown>) => ({
+        userId,
+        tenantId,
+        appName: a.appName || 'Unknown',
+        windowTitle: a.windowTitle || '',
+        url: a.url || '',
+        startTime: a.startTime ? new Date(a.startTime as string) : new Date(),
+        endTime: a.endTime ? new Date(a.endTime as string) : undefined,
+        durationMinutes: Number(a.durationMinutes) || 0,
+        category: (a.category && a.category !== 'neutral') ? a.category : categorizeActivity(String(a.appName || ''), String(a.windowTitle || ''), String(a.url || '')),
+      }));
+      await ActivityLog.insertMany(docs);
+    }
+
+    if (idleTimeMinutes && Number(idleTimeMinutes) > 0) {
+      const today = formatDate(new Date());
+      const attendance = await Attendance.findOne({ userId, date: today });
+      if (attendance && attendance.punchIn && !attendance.punchOut) {
+        attendance.idleMinutes = (attendance.idleMinutes || 0) + Number(idleTimeMinutes);
+        await attendance.save();
+      }
+    }
+
+    res.json({ success: true, message: 'Sync complete.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Sync failed.', error: (error as Error).message });
   }
 };

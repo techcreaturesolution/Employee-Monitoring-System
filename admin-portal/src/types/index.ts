@@ -13,10 +13,6 @@ export interface User {
   agentKey: string;
   lastActive: string;
   isOnline: boolean;
-  workMode: 'office' | 'wfh' | 'field';
-  agentKey: string;
-  lastActive: string;
-  isOnline: boolean;
   lastKnownLocation?: {
     latitude: number;
     longitude: number;
@@ -77,9 +73,6 @@ export interface Attendance {
 export interface PunchRecord {
   time: string;
   ip: string;
-  location: { latitude: number; longitude: number; address: string };
-  screenshotUrl: string;
-  method: string;
   location: { latitude: number; longitude: number; address: string; accuracy: number };
   screenshotUrl: string;
   method: string;

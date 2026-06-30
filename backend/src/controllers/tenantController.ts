@@ -1,11 +1,12 @@
-import { Response } from 'express';
+import { Response, NextFunction } from 'express';
 import { Tenant } from '../models/Tenant';
 import { User } from '../models/User';
 import { Subscription } from '../models/Subscription';
 import { AuthRequest } from '../middleware/auth';
 import { paginate } from '../utils/helpers';
+import { logger } from '../utils/logger';
 
-export const listTenants = async (req: AuthRequest, res: Response): Promise<void> => {
+const listTenants = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { page = 1, limit = 20, status, search } = req.query;
     const { skip, limit: lim } = paginate(Number(page), Number(limit));
@@ -24,12 +25,17 @@ export const listTenants = async (req: AuthRequest, res: Response): Promise<void
       Tenant.countDocuments(filter),
     ]);
 
-    const tenantsWithCounts = await Promise.all(
-      tenants.map(async (tenant) => {
-        const employeeCount = await User.countDocuments({ tenantId: tenant._id });
-        return { ...tenant.toObject(), employeeCount };
-      })
-    );
+    const tenantIds = tenants.map((t) => t._id);
+    const counts = await User.aggregate([
+      { $match: { tenantId: { $in: tenantIds } } },
+      { $group: { _id: '$tenantId', count: { $sum: 1 } } },
+    ]);
+    const countMap = new Map(counts.map((c) => [String(c._id), c.count]));
+    
+    const tenantsWithCounts = tenants.map((t) => ({
+      ...t.toObject(),
+      employeeCount: countMap.get(String(t._id)) || 0,
+    }));
 
     res.json({
       success: true,
@@ -39,11 +45,12 @@ export const listTenants = async (req: AuthRequest, res: Response): Promise<void
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed.', error: (error as Error).message });
+    logger.error('listTenants failed:', error);
+    next(error);
   }
 };
 
-export const getTenant = async (req: AuthRequest, res: Response): Promise<void> => {
+const getTenant = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
     const tenant = await Tenant.findById(id);
@@ -62,11 +69,12 @@ export const getTenant = async (req: AuthRequest, res: Response): Promise<void> 
       data: { ...tenant.toObject(), employeeCount, subscription },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed.', error: (error as Error).message });
+    logger.error('getTenant failed:', error);
+    next(error);
   }
 };
 
-export const updateTenant = async (req: AuthRequest, res: Response): Promise<void> => {
+const updateTenant = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
     const allowedUpdates = ['name', 'status', 'plan', 'phone', 'domain'];
@@ -83,11 +91,12 @@ export const updateTenant = async (req: AuthRequest, res: Response): Promise<voi
 
     res.json({ success: true, message: 'Tenant updated.', data: tenant });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed.', error: (error as Error).message });
+    logger.error('updateTenant failed:', error);
+    next(error);
   }
 };
 
-export const deleteTenant = async (req: AuthRequest, res: Response): Promise<void> => {
+const deleteTenant = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
     const tenant = await Tenant.findByIdAndUpdate(id, { status: 'suspended' }, { new: true });
@@ -99,6 +108,9 @@ export const deleteTenant = async (req: AuthRequest, res: Response): Promise<voi
     await User.updateMany({ tenantId: id }, { status: 'suspended' });
     res.json({ success: true, message: 'Tenant suspended.' });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed.', error: (error as Error).message });
+    logger.error('deleteTenant failed:', error);
+    next(error);
   }
 };
+
+export { listTenants, getTenant, updateTenant, deleteTenant };

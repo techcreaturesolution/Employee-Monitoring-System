@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { User, IUser } from '../models/User';
+import { cache } from '../services/cache';
 
 export interface AuthRequest extends Request {
   user?: IUser;
@@ -15,14 +16,26 @@ interface JwtPayload {
 
 export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    let token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token && req.cookies && req.cookies.ems_token) {
+      token = req.cookies.ems_token;
+    }
+
     if (!token) {
       res.status(401).json({ success: false, message: 'Access denied. No token provided.' });
       return;
     }
 
     const decoded = jwt.verify(token, config.jwt.secret) as JwtPayload;
-    const user = await User.findById(decoded.userId);
+    
+    const cacheKey = `user:${decoded.userId}`;
+    let user = await cache.get<IUser>(cacheKey);
+
+    if (!user) {
+      user = await User.findById(decoded.userId);
+      if (user) await cache.set(cacheKey, user, 300); // 5 min TTL
+    }
 
     if (!user || user.status !== 'active') {
       res.status(401).json({ success: false, message: 'Invalid token or user inactive.' });

@@ -1,9 +1,10 @@
-import { Response } from 'express';
+import { Response, NextFunction } from 'express';
 import { Attendance } from '../models/Attendance';
 import { AuthRequest } from '../middleware/auth';
 import { formatDate, calculateWorkMinutes, paginate } from '../utils/helpers';
+import { logger } from '../utils/logger';
 
-export const punchIn = async (req: AuthRequest, res: Response): Promise<void> => {
+const punchIn = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?._id;
     const tenantId = req.user?.tenantId;
@@ -15,15 +16,6 @@ export const punchIn = async (req: AuthRequest, res: Response): Promise<void> =>
       return;
     }
 
-    const { ip, location, screenshotUrl, method } = req.body;
-
-    const attendance = existing || new Attendance({ userId, tenantId, date: today });
-    attendance.punchIn = {
-      time: new Date(),
-      ip: ip || req.ip || '',
-      location: location || { latitude: 0, longitude: 0, address: '' },
-      screenshotUrl: screenshotUrl || '',
-      method: method || 'web',
     const { ip, location, screenshotUrl, method, workMode } = req.body;
 
     const attendance = existing || new Attendance({ userId, tenantId, date: today });
@@ -41,41 +33,45 @@ export const punchIn = async (req: AuthRequest, res: Response): Promise<void> =>
 
     res.status(201).json({ success: true, message: 'Punched in successfully.', data: attendance });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Punch in failed.', error: (error as Error).message });
+    logger.error('punchIn failed:', error);
+    next(error);
   }
 };
 
-export const punchOut = async (req: AuthRequest, res: Response): Promise<void> => {
+const punchOut = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?._id;
     const today = formatDate(new Date());
 
-    const attendance = await Attendance.findOne({ userId, date: today });
-    if (!attendance?.punchIn) {
-      res.status(400).json({ success: false, message: 'Not punched in today.' });
-      return;
-    }
-    if (attendance.punchOut?.time) {
-      res.status(400).json({ success: false, message: 'Already punched out today.' });
-      return;
-    }
-
     const { ip, location, screenshotUrl, method } = req.body;
 
-    attendance.punchOut = {
+    const punchOutData = {
       time: new Date(),
       ip: ip || req.ip || '',
-      location: location || { latitude: 0, longitude: 0, address: '' },
-      screenshotUrl: screenshotUrl || '',
-      method: method || 'web',
       location: location || { latitude: 0, longitude: 0, address: '', accuracy: 0 },
       screenshotUrl: screenshotUrl || '',
       method: method || 'web',
       isInsideGeofence: false,
     };
 
+    const attendance = await Attendance.findOneAndUpdate(
+      {
+        userId,
+        date: today,
+        'punchIn.time': { $exists: true },
+        'punchOut.time': { $exists: false }, // atomic guard
+      },
+      { $set: { punchOut: punchOutData } },
+      { new: true }
+    );
+
+    if (!attendance) {
+      res.status(400).json({ success: false, message: 'Already punched out or not punched in.' });
+      return;
+    }
+
     const totalBreak = attendance.breaks.reduce((sum, b) => sum + (b.duration || 0), 0);
-    const totalWork = calculateWorkMinutes(attendance.punchIn.time, attendance.punchOut.time);
+    const totalWork = calculateWorkMinutes(attendance.punchIn!.time, attendance.punchOut!.time);
     attendance.totalWorkMinutes = totalWork - totalBreak;
     attendance.totalBreakMinutes = totalBreak;
 
@@ -88,18 +84,23 @@ export const punchOut = async (req: AuthRequest, res: Response): Promise<void> =
 
     res.json({ success: true, message: 'Punched out successfully.', data: attendance });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Punch out failed.', error: (error as Error).message });
+    logger.error('punchOut failed:', error);
+    next(error);
   }
 };
 
-export const startBreak = async (req: AuthRequest, res: Response): Promise<void> => {
+const startBreak = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?._id;
     const today = formatDate(new Date());
     const { reason } = req.body;
 
     const attendance = await Attendance.findOne({ userId, date: today });
-    if (!attendance?.punchIn || attendance.punchOut?.time) {
+    if (!attendance) {
+      res.status(404).json({ success: false, message: 'No attendance record found for today.' });
+      return;
+    }
+    if (!attendance.punchIn || attendance.punchOut?.time) {
       res.status(400).json({ success: false, message: 'Must be punched in and not punched out.' });
       return;
     }
@@ -120,11 +121,12 @@ export const startBreak = async (req: AuthRequest, res: Response): Promise<void>
 
     res.json({ success: true, message: 'Break started.', data: attendance });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to start break.', error: (error as Error).message });
+    logger.error('startBreak failed:', error);
+    next(error);
   }
 };
 
-export const endBreak = async (req: AuthRequest, res: Response): Promise<void> => {
+const endBreak = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?._id;
     const today = formatDate(new Date());
@@ -147,11 +149,12 @@ export const endBreak = async (req: AuthRequest, res: Response): Promise<void> =
 
     res.json({ success: true, message: 'Break ended.', data: attendance });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to end break.', error: (error as Error).message });
+    logger.error('endBreak failed:', error);
+    next(error);
   }
 };
 
-export const getTodayAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
+const getTodayAttendance = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?._id;
     const today = formatDate(new Date());
@@ -159,11 +162,12 @@ export const getTodayAttendance = async (req: AuthRequest, res: Response): Promi
     const attendance = await Attendance.findOne({ userId, date: today });
     res.json({ success: true, data: attendance || null });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to get attendance.', error: (error as Error).message });
+    logger.error('getTodayAttendance failed:', error);
+    next(error);
   }
 };
 
-export const getAttendanceHistory = async (req: AuthRequest, res: Response): Promise<void> => {
+const getAttendanceHistory = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.query.userId || req.user?._id;
     const tenantId = req.user?.tenantId;
@@ -201,11 +205,12 @@ export const getAttendanceHistory = async (req: AuthRequest, res: Response): Pro
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to get history.', error: (error as Error).message });
+    logger.error('getAttendanceHistory failed:', error);
+    next(error);
   }
 };
 
-export const getAttendanceReport = async (req: AuthRequest, res: Response): Promise<void> => {
+const getAttendanceReport = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const tenantId = req.user?.tenantId;
     const { startDate, endDate } = req.query;
@@ -259,6 +264,17 @@ export const getAttendanceReport = async (req: AuthRequest, res: Response): Prom
 
     res.json({ success: true, data: report });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to generate report.', error: (error as Error).message });
+    logger.error('getAttendanceReport failed:', error);
+    next(error);
   }
+};
+
+export {
+  punchIn,
+  punchOut,
+  startBreak,
+  endBreak,
+  getTodayAttendance,
+  getAttendanceHistory,
+  getAttendanceReport,
 };

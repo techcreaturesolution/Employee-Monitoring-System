@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { dashboardAPI } from '../services/api';
 import { DashboardStats, Screenshot } from '../types';
@@ -34,7 +34,10 @@ const Dashboard: React.FC = () => {
   const [recentScreenshots, setRecentScreenshots] = useState<Screenshot[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const isAdmin = user?.role === 'company_admin' || user?.role === 'super_admin' || user?.role === 'manager';
+  const isAdmin = useMemo(() => 
+    user?.role === 'company_admin' || user?.role === 'super_admin' || user?.role === 'manager',
+    [user?.role]
+  );
 
   useEffect(() => {
     const fetchDashboard = async () => {

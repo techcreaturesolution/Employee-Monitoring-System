@@ -20,52 +20,59 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('ems_token');
-    if (token) {
-      authAPI
-        .getMe()
-        .then((res) => {
+    let isMounted = true;
+    // Check if user is already authenticated
+    // Cookie is sent automatically by browser
+    authAPI
+      .getMe()
+      .then((res) => {
+        if (isMounted) {
           setUser(res.data.data.user);
           setTenant(res.data.data.tenant);
-        })
-        .catch(() => {
-          localStorage.removeItem('ems_token');
-          localStorage.removeItem('ems_user');
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+        }
+      })
+      .catch((error) => {
+        if (isMounted) {
+          console.error('Failed to fetch user:', error);
+        }
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+      
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
     const res = await authAPI.login({ email, password });
-    const { user: userData, tenant: tenantData, accessToken } = res.data.data;
-    localStorage.setItem('ems_token', accessToken);
-    localStorage.setItem('ems_user', JSON.stringify(userData));
+    const { user: userData, tenant: tenantData } = res.data.data;
+    // Cookie is set automatically by server!
     setUser(userData);
     setTenant(tenantData);
   };
 
   const register = async (data: Record<string, string>) => {
     const res = await authAPI.register(data);
-    const { user: userData, tenant: tenantData, accessToken } = res.data.data;
-    localStorage.setItem('ems_token', accessToken);
-    localStorage.setItem('ems_user', JSON.stringify(userData));
+    const { user: userData, tenant: tenantData } = res.data.data;
+    // Cookie is set automatically by server!
     setUser(userData);
     setTenant(tenantData);
   };
 
-  const logout = () => {
-    localStorage.removeItem('ems_token');
-    localStorage.removeItem('ems_user');
+  const logout = async () => {
+    try {
+      await authAPI.logout(); 
+    } catch (err) {
+      // Ignore errors
+    }
     setUser(null);
     setTenant(null);
   };
 
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
-    localStorage.setItem('ems_user', JSON.stringify(updatedUser));
   };
 
   return (

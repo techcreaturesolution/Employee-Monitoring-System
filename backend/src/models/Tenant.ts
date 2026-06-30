@@ -27,6 +27,16 @@ export interface ITenant extends Document {
     allowManualPunch: boolean;
     autoStopTracking: boolean;
     idleTimeThreshold: number;
+    enableGeofencing: boolean;
+    officeLocations: Array<{
+      name: string;
+      latitude: number;
+      longitude: number;
+      radiusMeters: number;
+    }>;
+    mobileLocationInterval: number;
+    requireLocationForPunch: boolean;
+    enforceDeviceFingerprint: boolean;
   };
   subscriptionId: mongoose.Types.ObjectId;
   trialEndsAt: Date;
@@ -70,6 +80,18 @@ const tenantSchema = new Schema<ITenant>(
       allowManualPunch: { type: Boolean, default: true },
       autoStopTracking: { type: Boolean, default: true },
       idleTimeThreshold: { type: Number, default: 5 },
+      enableGeofencing: { type: Boolean, default: false },
+      officeLocations: [
+        {
+          name: { type: String, required: true },
+          latitude: { type: Number, required: true },
+          longitude: { type: Number, required: true },
+          radiusMeters: { type: Number, default: 100 },
+        },
+      ],
+      mobileLocationInterval: { type: Number, default: 15 },
+      requireLocationForPunch: { type: Boolean, default: false },
+      enforceDeviceFingerprint: { type: Boolean, default: false },
     },
     subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription' },
     trialEndsAt: { type: Date, default: () => new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },

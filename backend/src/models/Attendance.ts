@@ -14,9 +14,6 @@ export interface IPunchRecord {
     latitude: number;
     longitude: number;
     address: string;
-  };
-  screenshotUrl: string;
-  method: 'agent' | 'web' | 'manual';
     accuracy: number;
   };
   screenshotUrl: string;
@@ -29,12 +26,13 @@ export interface IAttendance extends Document {
   tenantId: mongoose.Types.ObjectId;
   date: string;
   workMode: 'office' | 'wfh' | 'field';
-  punchIn: IPunchRecord;
-  punchOut: IPunchRecord;
+  punchIn?: IPunchRecord;
+  punchOut?: IPunchRecord;
   breaks: IBreak[];
   totalWorkMinutes: number;
   totalBreakMinutes: number;
   overtimeMinutes: number;
+  idleMinutes: number;
   status: 'present' | 'absent' | 'half-day' | 'late' | 'on-leave';
   notes: string;
   approvedBy: mongoose.Types.ObjectId;
@@ -55,9 +53,6 @@ const punchRecordSchema = new Schema<IPunchRecord>(
     screenshotUrl: { type: String, default: '' },
     method: {
       type: String,
-      enum: ['agent', 'web', 'manual'],
-      default: 'web',
-    },
       enum: ['agent', 'web', 'manual', 'mobile'],
       default: 'web',
     },
@@ -92,6 +87,7 @@ const attendanceSchema = new Schema<IAttendance>(
     totalWorkMinutes: { type: Number, default: 0 },
     totalBreakMinutes: { type: Number, default: 0 },
     overtimeMinutes: { type: Number, default: 0 },
+    idleMinutes: { type: Number, default: 0 },
     status: {
       type: String,
       enum: ['present', 'absent', 'half-day', 'late', 'on-leave'],

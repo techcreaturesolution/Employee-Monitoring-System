@@ -129,12 +129,16 @@ This creates:
 # Terminal 1: Backend
 cd backend && npm run dev
 
-# Terminal 2: Frontend
+# Terminal 2: Admin Portal
 cd admin-portal && npm run dev
+
+# Terminal 3: Desktop App
+cd ems-desktop-app && npm run dev
 ```
 
 - **Backend API**: http://localhost:5000
-- **Frontend**: http://localhost:5173
+- **Admin Portal**: http://localhost:3001
+- **Desktop App (React UI)**: http://localhost:3002
 - **API Health**: http://localhost:5000/api/health
 
 ### 5. Start Desktop Agent (Optional)

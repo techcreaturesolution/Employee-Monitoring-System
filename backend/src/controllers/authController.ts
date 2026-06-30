@@ -1,36 +1,72 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { User } from '../models/User';
 import { Tenant } from '../models/Tenant';
 import { generateTokens, generateAgentKey } from '../utils/helpers';
 import { AuthRequest } from '../middleware/auth';
+import { registerSchema, loginSchema } from '../validators/authValidator';
+import { z } from 'zod';
+import { config } from '../config';
+import { logger } from '../utils/logger';
 
-export const register = async (req: Request, res: Response): Promise<void> => {
+const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { companyName, name, email, password, phone } = req.body;
+    let validated;
+    try {
+      validated = registerSchema.parse(req.body);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: error.errors.map((e) => ({
+            field: e.path.join('.'),
+            message: e.message,
+          })),
+        });
+        return;
+      }
+      throw error;
+    }
 
-    const existingTenant = await Tenant.findOne({ email });
+    const existingTenant = await Tenant.findOne({ email: validated.email });
     if (existingTenant) {
       res.status(409).json({ success: false, message: 'Company with this email already exists.' });
       return;
     }
 
     const tenant = await Tenant.create({
-      name: companyName,
-      email,
-      phone: phone || '',
+      name: validated.companyName,
+      email: validated.email,
+      phone: validated.phone || '',
     });
 
     const user = await User.create({
-      name,
-      email,
-      password,
+      name: validated.name,
+      email: validated.email,
+      password: validated.password,
       role: 'company_admin',
       tenantId: tenant._id,
-      phone: phone || '',
+      phone: validated.phone || '',
       agentKey: generateAgentKey(),
     });
 
     const { accessToken, refreshToken } = generateTokens(user);
+
+    res.cookie('ems_token', accessToken, {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+    });
+
+    res.cookie('ems_refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: 'strict',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      path: '/',
+    });
 
     res.status(201).json({
       success: true,
@@ -54,13 +90,32 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Registration failed.', error: (error as Error).message });
+    logger.error('Registration failed:', error);
+    next(error);
   }
 };
 
-export const login = async (req: Request, res: Response): Promise<void> => {
+const login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { email, password } = req.body;
+    let validated;
+    try {
+      validated = loginSchema.parse(req.body);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: error.errors.map((e) => ({
+            field: e.path.join('.'),
+            message: e.message,
+          })),
+        });
+        return;
+      }
+      throw error;
+    }
+
+    const { email, password, deviceId } = validated;
 
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
@@ -78,17 +133,49 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       res.status(401).json({ success: false, message: 'Invalid email or password.' });
       return;
     }
+    
+    let tenant = null;
+    if (user.tenantId) {
+      tenant = await Tenant.findById(user.tenantId);
+      if (tenant && tenant.status === 'suspended') {
+        res.status(403).json({ success: false, message: 'Company account is suspended. Contact support.' });
+        return;
+      }
+    }
 
     user.lastActive = new Date();
     user.isOnline = true;
+    
+    if (!user.agentKey) {
+      user.agentKey = generateAgentKey();
+      logger.info(`Generated new agentKey for user: ${user.email}`);
+    }
+
+    if (deviceId) {
+      user.deviceFingerprints = user.deviceFingerprints || [];
+      if (!user.deviceFingerprints.includes(deviceId)) {
+        user.deviceFingerprints.push(deviceId);
+      }
+    }
     await user.save();
 
     const { accessToken, refreshToken } = generateTokens(user);
 
-    let tenant = null;
-    if (user.tenantId) {
-      tenant = await Tenant.findById(user.tenantId);
-    }
+    res.cookie('ems_token', accessToken, {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+    });
+
+    res.cookie('ems_refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: 'strict',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      path: '/',
+    });
 
     res.json({
       success: true,
@@ -103,6 +190,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
           department: user.department,
           designation: user.designation,
           avatar: user.avatar,
+          agentKey: user.agentKey,
         },
         tenant: tenant
           ? {
@@ -117,11 +205,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Login failed.', error: (error as Error).message });
+    logger.error('Login failed:', error);
+    next(error);
   }
 };
 
-export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
+const getMe = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const user = req.user;
     if (!user) {
@@ -165,11 +254,20 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to get profile.', error: (error as Error).message });
+    logger.error('Failed to get profile:', error);
+    next(error);
   }
 };
 
-export const updateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
+const updateProfileSchema = z.object({
+  name: z.string().min(1).max(100).trim().optional(),
+  phone: z.string().max(20).trim().optional(),
+  avatar: z.string().url().max(500).optional(),
+  department: z.string().max(100).trim().optional(),
+  designation: z.string().max(100).trim().optional(),
+});
+
+const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const user = req.user;
     if (!user) {
@@ -177,17 +275,41 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    const allowedUpdates = ['name', 'phone', 'avatar', 'department', 'designation'];
-    const updates: Record<string, unknown> = {};
-    for (const key of allowedUpdates) {
-      if (req.body[key] !== undefined) {
-        updates[key] = req.body[key];
+    let validated;
+    try {
+      validated = updateProfileSchema.parse(req.body);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          success: false,
+          message: 'Validation failed',
+          errors: error.errors.map((e) => ({
+            field: e.path.join('.'),
+            message: e.message,
+          })),
+        });
+        return;
       }
+      throw error;
     }
 
-    const updated = await User.findByIdAndUpdate(user._id, updates, { new: true });
+    const updated = await User.findByIdAndUpdate(user._id, validated, { new: true });
     res.json({ success: true, message: 'Profile updated.', data: updated });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Update failed.', error: (error as Error).message });
+    logger.error('Update failed:', error);
+    next(error);
   }
 };
+
+const logout = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    res.clearCookie('ems_token', { path: '/', httpOnly: true, secure: config.nodeEnv === 'production', sameSite: 'strict' });
+    res.clearCookie('ems_refresh_token', { path: '/', httpOnly: true, secure: config.nodeEnv === 'production', sameSite: 'strict' });
+    res.json({ success: true, message: 'Logged out successfully.' });
+  } catch (error) {
+    logger.error('Logout failed:', error);
+    next(error);
+  }
+};
+
+export { register, login, getMe, updateProfile, logout };

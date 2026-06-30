@@ -8,7 +8,7 @@ import { generateTokens, formatDate, calculateWorkMinutes, isInsideGeofence } fr
 
 export const mobileLogin = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
+    const { email, password, deviceId } = req.body;
 
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
@@ -29,6 +29,12 @@ export const mobileLogin = async (req: Request, res: Response): Promise<void> =>
 
     user.lastActive = new Date();
     user.isOnline = true;
+    if (deviceId) {
+      user.deviceFingerprints = user.deviceFingerprints || [];
+      if (!user.deviceFingerprints.includes(deviceId)) {
+        user.deviceFingerprints.push(deviceId);
+      }
+    }
     await user.save();
 
     const { accessToken, refreshToken } = generateTokens(user);
@@ -50,6 +56,7 @@ export const mobileLogin = async (req: Request, res: Response): Promise<void> =>
           workMode: user.workMode,
           avatar: user.avatar,
           phone: user.phone,
+          agentKey: user.agentKey,
         },
         tenant: tenant
           ? {

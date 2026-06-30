@@ -1,11 +1,13 @@
-import { Response } from 'express';
+import { Response, NextFunction } from 'express';
 import { Screenshot } from '../models/Screenshot';
 import { AuthRequest } from '../middleware/auth';
 import { paginate } from '../utils/helpers';
 import path from 'path';
 import fs from 'fs';
+import { config } from '../config';
+import { logger } from '../utils/logger';
 
-export const uploadScreenshot = async (req: AuthRequest, res: Response): Promise<void> => {
+const uploadScreenshot = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?._id;
     const tenantId = req.user?.tenantId;
@@ -36,11 +38,12 @@ export const uploadScreenshot = async (req: AuthRequest, res: Response): Promise
 
     res.status(201).json({ success: true, message: 'Screenshot uploaded.', data: screenshot });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Upload failed.', error: (error as Error).message });
+    logger.error('uploadScreenshot failed:', error);
+    next(error);
   }
 };
 
-export const listScreenshots = async (req: AuthRequest, res: Response): Promise<void> => {
+const listScreenshots = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const tenantId = req.user?.tenantId;
     const { page = 1, limit = 20, userId, startDate, endDate, productivityTag } = req.query;
@@ -79,11 +82,12 @@ export const listScreenshots = async (req: AuthRequest, res: Response): Promise<
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to list screenshots.', error: (error as Error).message });
+    logger.error('listScreenshots failed:', error);
+    next(error);
   }
 };
 
-export const getScreenshot = async (req: AuthRequest, res: Response): Promise<void> => {
+const getScreenshot = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
     const tenantId = req.user?.tenantId;
@@ -98,11 +102,12 @@ export const getScreenshot = async (req: AuthRequest, res: Response): Promise<vo
 
     res.json({ success: true, data: screenshot });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to get screenshot.', error: (error as Error).message });
+    logger.error('getScreenshot failed:', error);
+    next(error);
   }
 };
 
-export const deleteScreenshot = async (req: AuthRequest, res: Response): Promise<void> => {
+const deleteScreenshot = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
     const tenantId = req.user?.tenantId;
@@ -113,13 +118,29 @@ export const deleteScreenshot = async (req: AuthRequest, res: Response): Promise
       return;
     }
 
-    const filePath = path.resolve(screenshot.imageUrl.replace(/^\//, ''));
+    const UPLOAD_DIR = path.resolve(config.upload.dir, 'screenshots');
+    const filePath = path.resolve(UPLOAD_DIR, path.basename(screenshot.imageUrl));
+
+    // Guard: ensure resolved path is within upload directory
+    if (!filePath.startsWith(UPLOAD_DIR + path.sep)) {
+      res.status(400).json({ success: false, message: 'Invalid file path.' });
+      return;
+    }
+
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
 
     res.json({ success: true, message: 'Screenshot deleted.' });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to delete screenshot.', error: (error as Error).message });
+    logger.error('deleteScreenshot failed:', error);
+    next(error);
   }
+};
+
+export {
+  uploadScreenshot,
+  listScreenshots,
+  getScreenshot,
+  deleteScreenshot,
 };

@@ -1,14 +1,21 @@
-import { Response } from 'express';
+import { Response, NextFunction } from 'express';
+import mongoose from 'mongoose';
 import { User } from '../models/User';
 import { Attendance } from '../models/Attendance';
 import { Screenshot } from '../models/Screenshot';
 import { ActivityLog } from '../models/ActivityLog';
 import { AuthRequest } from '../middleware/auth';
 import { formatDate } from '../utils/helpers';
+import { logger } from '../utils/logger';
 
-export const getAdminDashboard = async (req: AuthRequest, res: Response): Promise<void> => {
+const getAdminDashboard = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const tenantId = req.user?.tenantId;
+    if (!tenantId) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+    const tenantObjId = new mongoose.Types.ObjectId(String(tenantId));
     const today = formatDate(new Date());
 
     const [
@@ -20,17 +27,17 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response): Promis
       recentScreenshots,
       attendanceStats,
     ] = await Promise.all([
-      User.countDocuments({ tenantId, role: { $ne: 'super_admin' } }),
-      User.countDocuments({ tenantId, status: 'active', role: { $ne: 'super_admin' } }),
-      Attendance.countDocuments({ tenantId, date: today }),
-      Screenshot.countDocuments({ tenantId, timestamp: { $gte: new Date(today) } }),
-      User.countDocuments({ tenantId, isOnline: true }),
-      Screenshot.find({ tenantId })
+      User.countDocuments({ tenantId: tenantObjId, role: { $ne: 'super_admin' } }),
+      User.countDocuments({ tenantId: tenantObjId, status: 'active', role: { $ne: 'super_admin' } }),
+      Attendance.countDocuments({ tenantId: tenantObjId, date: today }),
+      Screenshot.countDocuments({ tenantId: tenantObjId, timestamp: { $gte: new Date(today) } }),
+      User.countDocuments({ tenantId: tenantObjId, isOnline: true }),
+      Screenshot.find({ tenantId: tenantObjId })
         .populate('userId', 'name email avatar')
         .sort({ timestamp: -1 })
         .limit(8),
       Attendance.aggregate([
-        { $match: { tenantId, date: today } },
+        { $match: { tenantId: tenantObjId, date: today } },
         {
           $group: {
             _id: '$status',
@@ -40,19 +47,53 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response): Promis
       ]),
     ]);
 
+    // Get attendance for last 7 days in ONE query
+    const last7DaysData = await Attendance.aggregate([
+      {
+        $match: {
+          tenantId: tenantObjId,
+          status: 'present',
+          date: {
+            $gte: new Date(
+              new Date().setDate(new Date().getDate() - 6)
+            )
+              .toISOString()
+              .split('T')[0],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: '$date',
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+    ]);
+
+    // Build map for quick lookup
+    const attendanceMap = new Map(
+      last7DaysData.map((item) => [item._id, item.count])
+    );
+
+    // Fill missing dates
     const last7Days = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dateStr = formatDate(d);
-      const count = await Attendance.countDocuments({ tenantId, date: dateStr, status: 'present' });
-      last7Days.push({ date: dateStr, present: count });
+      last7Days.push({
+        date: dateStr,
+        present: attendanceMap.get(dateStr) || 0,
+      });
     }
 
     const productivityBreakdown = await ActivityLog.aggregate([
       {
         $match: {
-          tenantId,
+          tenantId: tenantObjId,
           startTime: { $gte: new Date(today) },
         },
       },
@@ -82,24 +123,31 @@ export const getAdminDashboard = async (req: AuthRequest, res: Response): Promis
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Dashboard failed.', error: (error as Error).message });
+    logger.error('Admin Dashboard failed:', error);
+    next(error);
   }
 };
 
-export const getEmployeeDashboard = async (req: AuthRequest, res: Response): Promise<void> => {
+const getEmployeeDashboard = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?._id;
     const tenantId = req.user?.tenantId;
+    if (!userId || !tenantId) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+    const tenantObjId = new mongoose.Types.ObjectId(String(tenantId));
+    const userObjId = new mongoose.Types.ObjectId(String(userId));
     const today = formatDate(new Date());
 
     const [todayAttendance, todayScreenshots, recentActivity, weekAttendance] = await Promise.all([
-      Attendance.findOne({ userId, date: today }),
-      Screenshot.countDocuments({ userId, timestamp: { $gte: new Date(today) } }),
-      ActivityLog.find({ userId })
+      Attendance.findOne({ userId: userObjId, date: today }),
+      Screenshot.countDocuments({ userId: userObjId, timestamp: { $gte: new Date(today) } }),
+      ActivityLog.find({ userId: userObjId })
         .sort({ startTime: -1 })
         .limit(10),
       Attendance.find({
-        userId,
+        userId: userObjId,
         date: {
           $gte: formatDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)),
           $lte: today,
@@ -110,8 +158,8 @@ export const getEmployeeDashboard = async (req: AuthRequest, res: Response): Pro
     const productivityToday = await ActivityLog.aggregate([
       {
         $match: {
-          userId,
-          tenantId,
+          userId: userObjId,
+          tenantId: tenantObjId,
           startTime: { $gte: new Date(today) },
         },
       },
@@ -134,6 +182,9 @@ export const getEmployeeDashboard = async (req: AuthRequest, res: Response): Pro
       },
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Dashboard failed.', error: (error as Error).message });
+    logger.error('Employee Dashboard failed:', error);
+    next(error);
   }
 };
+
+export { getAdminDashboard, getEmployeeDashboard };

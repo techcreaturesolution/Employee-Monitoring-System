@@ -17,9 +17,9 @@ export interface IUser extends Document {
   lastActive: Date;
   isOnline: boolean;
   workMode: 'office' | 'wfh' | 'field';
-  agentKey: string;
-  lastActive: Date;
-  isOnline: boolean;
+  deviceFingerprints: string[];
+  mustChangePassword?: boolean;
+
   lastKnownLocation: {
     latitude: number;
     longitude: number;
@@ -33,49 +33,56 @@ export interface IUser extends Document {
 
 const userSchema = new Schema<IUser>(
   {
-    name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, lowercase: true },
-    password: { type: String, required: true, select: false },
+    name:       { type: String, required: true, trim: true },
+    // NOTE: Do NOT add `index: true` here — indexes are declared via userSchema.index() below
+    email:      { type: String, required: true, lowercase: true },
+    password:   { type: String, required: true, select: false },
     role: {
       type: String,
       enum: ['super_admin', 'company_admin', 'manager', 'employee'],
       default: 'employee',
     },
-    tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant' },
+    tenantId:   { type: Schema.Types.ObjectId, ref: 'Tenant' },
     department: { type: String, default: '' },
-    designation: { type: String, default: '' },
+    designation:{ type: String, default: '' },
     employeeId: { type: String, default: '' },
-    avatar: { type: String, default: '' },
-    phone: { type: String, default: '' },
+    avatar:     { type: String, default: '' },
+    phone:      { type: String, default: '' },
     status: {
       type: String,
       enum: ['active', 'inactive', 'suspended'],
       default: 'active',
     },
-    agentKey: { type: String, unique: true, sparse: true },
+    agentKey:   { type: String },
     lastActive: { type: Date },
-    isOnline: { type: Boolean, default: false },
+    isOnline:   { type: Boolean, default: false },
     workMode: {
       type: String,
       enum: ['office', 'wfh', 'field'],
       default: 'office',
     },
-    agentKey: { type: String, unique: true, sparse: true },
-    lastActive: { type: Date },
-    isOnline: { type: Boolean, default: false },
+    deviceFingerprints: [{ type: String }],
+    mustChangePassword: { type: Boolean, default: false },
+
     lastKnownLocation: {
-      latitude: { type: Number, default: 0 },
+      latitude:  { type: Number, default: 0 },
       longitude: { type: Number, default: 0 },
-      address: { type: String, default: '' },
+      address:   { type: String, default: '' },
       updatedAt: { type: Date },
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    // Disable auto-index creation — we define all indexes explicitly below
+    autoIndex: true,
+  }
 );
 
-userSchema.index({ email: 1, tenantId: 1 }, { unique: true });
-userSchema.index({ tenantId: 1, status: 1 });
-userSchema.index({ agentKey: 1 });
+// ============ INDEXES ============
+// Each field appears in exactly ONE index definition to avoid duplicate warnings
+userSchema.index({ email: 1, tenantId: 1 }, { unique: true }); // unique per tenant
+userSchema.index({ tenantId: 1, status: 1 });                  // filter by tenant + status
+userSchema.index({ agentKey: 1 }, { unique: true, sparse: true }); // desktop agent auth
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();

@@ -1,20 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { settingsAPI } from '../services/api';
-<<<<<<< HEAD
-import { Settings, Save } from 'lucide-react';
-=======
 import { Settings, Save, MapPin, Plus, Trash2 } from 'lucide-react';
->>>>>>> origin/main
 import toast, { Toaster } from 'react-hot-toast';
 
 const SettingsPage: React.FC = () => {
   const [company, setCompany] = useState({ name: '', email: '', phone: '', domain: '' });
   const [monitoring, setMonitoring] = useState({
-<<<<<<< HEAD
-    screenshotInterval: 2,
-=======
     screenshotInterval: 10,
->>>>>>> origin/main
     trackApps: true,
     trackUrls: true,
     blurScreenshots: false,
@@ -24,13 +16,10 @@ const SettingsPage: React.FC = () => {
     allowManualPunch: true,
     autoStopTracking: true,
     idleTimeThreshold: 5,
-<<<<<<< HEAD
-=======
     enableGeofencing: false,
     officeLocations: [] as Array<{ name: string; latitude: number; longitude: number; radiusMeters: number }>,
     mobileLocationInterval: 15,
     requireLocationForPunch: false,
->>>>>>> origin/main
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -145,14 +134,6 @@ const SettingsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setMonitoring({ ...monitoring, [item.key]: !monitoring[item.key as keyof typeof monitoring] })}
-<<<<<<< HEAD
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${monitoring[item.key as keyof typeof monitoring] ? 'bg-blue-600' : 'bg-slate-300'
-                      }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${monitoring[item.key as keyof typeof monitoring] ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-=======
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                       monitoring[item.key as keyof typeof monitoring] ? 'bg-blue-600' : 'bg-slate-300'
                     }`}
@@ -161,7 +142,6 @@ const SettingsPage: React.FC = () => {
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         monitoring[item.key as keyof typeof monitoring] ? 'translate-x-6' : 'translate-x-1'
                       }`}
->>>>>>> origin/main
                     />
                   </button>
                 </div>
@@ -169,8 +149,6 @@ const SettingsPage: React.FC = () => {
             </div>
           </div>
         </div>
-<<<<<<< HEAD
-=======
         <div className="bg-white rounded-xl p-6 shadow-sm border col-span-1 lg:col-span-2">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <MapPin className="w-5 h-5 text-red-500" /> Geo-Location & Geofencing
@@ -313,7 +291,6 @@ const SettingsPage: React.FC = () => {
             </div>
           </div>
         </div>
->>>>>>> origin/main
       </div>
     </div>
   );

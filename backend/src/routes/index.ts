@@ -11,6 +11,7 @@ import tenantRoutes from './tenantRoutes';
 import agentRoutes from './agentRoutes';
 import locationRoutes from './locationRoutes';
 import mobileRoutes from './mobileRoutes';
+import taskRoutes from './taskRoutes';
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use('/tenants', tenantRoutes);
 router.use('/agent', agentRoutes);
 router.use('/location', locationRoutes);
 router.use('/mobile', mobileRoutes);
+router.use('/tasks', taskRoutes);
 
 export default router;
