@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 import { Tenant } from '../models/Tenant';
 import { generateTokens, generateAgentKey } from '../utils/helpers';
@@ -353,4 +354,58 @@ const uploadAvatarController = async (req: AuthRequest, res: Response, next: Nex
   }
 };
 
-export { register, login, getMe, updateProfile, logout, uploadAvatarController };
+interface JwtPayload {
+  userId: string;
+  role: string;
+  tenantId: string;
+}
+
+const refreshToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const token = req.cookies?.ems_refresh_token;
+
+    if (!token) {
+      res.status(401).json({ success: false, message: 'Refresh token not found.' });
+      return;
+    }
+
+    const decoded = jwt.verify(token, config.jwt.refreshSecret) as JwtPayload;
+    
+    const user = await User.findById(decoded.userId);
+    if (!user || user.status !== 'active') {
+      res.status(401).json({ success: false, message: 'Invalid token or user inactive.' });
+      return;
+    }
+
+    const { accessToken, refreshToken: newRefreshToken } = generateTokens(user);
+
+    res.cookie('ems_token', accessToken, {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+    });
+
+    res.cookie('ems_refresh_token', newRefreshToken, {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      path: '/',
+    });
+
+    res.json({
+      success: true,
+      data: {
+        accessToken,
+        refreshToken: newRefreshToken,
+      },
+    });
+  } catch (error) {
+    logger.error('Token refresh failed:', error);
+    res.status(401).json({ success: false, message: 'Invalid or expired refresh token.' });
+  }
+};
+
+export { register, login, getMe, updateProfile, logout, uploadAvatarController, refreshToken };
