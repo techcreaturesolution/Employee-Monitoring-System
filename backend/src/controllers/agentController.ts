@@ -7,6 +7,7 @@ import { Tenant } from '../models/Tenant';
 import { AuthRequest } from '../middleware/auth';
 import { formatDate, calculateWorkMinutes } from '../utils/helpers';
 import path from 'path';
+import { uploadToCloudinary, getCloudinaryThumbnail } from '../utils/cloudinary';
 
 export const agentHeartbeat = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -34,14 +35,27 @@ export const agentScreenshot = async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    const { activeApp, windowTitle, productivityTag } = req.body;
+    const { activeApp, windowTitle } = req.body;
+
+    let imageUrl = `/uploads/screenshots/${file.filename}`;
+    let thumbnailUrl = `/uploads/screenshots/${file.filename}`;
+
+    try {
+      const cloudinaryResult = await uploadToCloudinary(file.path, 'screenshots');
+      if (cloudinaryResult) {
+        imageUrl = cloudinaryResult.secureUrl;
+        thumbnailUrl = getCloudinaryThumbnail(cloudinaryResult.secureUrl);
+      }
+    } catch (uploadError) {
+      console.error('Failed to upload screenshot to Cloudinary, using local fallback:', uploadError);
+    }
 
     const screenshot = await Screenshot.create({
       userId,
       tenantId,
       timestamp: new Date(),
-      imageUrl: `/uploads/screenshots/${file.filename}`,
-      thumbnailUrl: `/uploads/screenshots/${file.filename}`,
+      imageUrl,
+      thumbnailUrl,
       activeApp: activeApp || '',
       windowTitle: windowTitle || '',
       productivityTag: categorizeActivity(activeApp || '', windowTitle || '', ''),
@@ -233,17 +247,25 @@ export const agentSync = async (req: AuthRequest, res: Response): Promise<void> 
     const { activities, idleTimeMinutes } = req.body;
 
     if (Array.isArray(activities) && activities.length > 0) {
-      const docs = activities.map((a: Record<string, unknown>) => ({
-        userId,
-        tenantId,
-        appName: a.appName || 'Unknown',
-        windowTitle: a.windowTitle || '',
-        url: a.url || '',
-        startTime: a.startTime ? new Date(a.startTime as string) : new Date(),
-        endTime: a.endTime ? new Date(a.endTime as string) : undefined,
-        durationMinutes: Number(a.durationMinutes) || 0,
-        category: (a.category && a.category !== 'neutral') ? a.category : categorizeActivity(String(a.appName || ''), String(a.windowTitle || ''), String(a.url || '')),
-      }));
+      const validCategories = ['productive', 'unproductive', 'neutral'];
+      const docs = activities.map((a: Record<string, unknown>) => {
+        const incomingCat = String(a.category || '');
+        const category = validCategories.includes(incomingCat) && incomingCat !== 'neutral'
+          ? incomingCat
+          : categorizeActivity(String(a.appName || ''), String(a.windowTitle || ''), String(a.url || ''));
+
+        return {
+          userId,
+          tenantId,
+          appName: a.appName || 'Unknown',
+          windowTitle: a.windowTitle || '',
+          url: a.url || '',
+          startTime: a.startTime ? new Date(a.startTime as string) : new Date(),
+          endTime: a.endTime ? new Date(a.endTime as string) : undefined,
+          durationMinutes: Number(a.durationMinutes) || 0,
+          category,
+        };
+      });
       await ActivityLog.insertMany(docs);
     }
 

@@ -6,6 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import { config } from '../config';
 import { logger } from '../utils/logger';
+import { uploadToCloudinary, getCloudinaryThumbnail } from '../utils/cloudinary';
 
 const uploadScreenshot = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -20,12 +21,25 @@ const uploadScreenshot = async (req: AuthRequest, res: Response, next: NextFunct
 
     const { activeApp, windowTitle, productivityTag } = req.body;
 
+    let imageUrl = `/uploads/screenshots/${file.filename}`;
+    let thumbnailUrl = `/uploads/screenshots/${file.filename}`;
+
+    try {
+      const cloudinaryResult = await uploadToCloudinary(file.path, 'screenshots');
+      if (cloudinaryResult) {
+        imageUrl = cloudinaryResult.secureUrl;
+        thumbnailUrl = getCloudinaryThumbnail(cloudinaryResult.secureUrl);
+      }
+    } catch (uploadError) {
+      logger.error('Failed to upload screenshot to Cloudinary, using local fallback:', uploadError);
+    }
+
     const screenshot = await Screenshot.create({
       userId,
       tenantId,
       timestamp: new Date(),
-      imageUrl: `/uploads/screenshots/${file.filename}`,
-      thumbnailUrl: `/uploads/screenshots/${file.filename}`,
+      imageUrl,
+      thumbnailUrl,
       activeApp: activeApp || '',
       windowTitle: windowTitle || '',
       productivityTag: productivityTag || 'neutral',
