@@ -7,7 +7,8 @@ import { Tenant } from '../models/Tenant';
 import { AuthRequest } from '../middleware/auth';
 import { formatDate, calculateWorkMinutes } from '../utils/helpers';
 import path from 'path';
-import { uploadToCloudinary, getCloudinaryThumbnail } from '../utils/cloudinary';
+import fs from 'fs';
+import { uploadToCloudinary, getCloudinaryThumbnail, isCloudinaryConfigured } from '../utils/cloudinary';
 
 export const agentHeartbeat = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -39,15 +40,35 @@ export const agentScreenshot = async (req: AuthRequest, res: Response): Promise<
 
     let imageUrl = `/uploads/screenshots/${file.filename}`;
     let thumbnailUrl = `/uploads/screenshots/${file.filename}`;
+    let publicId = '';
+    let uploadedToCloud = false;
 
-    try {
-      const cloudinaryResult = await uploadToCloudinary(file.path, 'screenshots');
-      if (cloudinaryResult) {
-        imageUrl = cloudinaryResult.secureUrl;
-        thumbnailUrl = getCloudinaryThumbnail(cloudinaryResult.secureUrl);
+    // Check Cloudinary config first
+    if (!isCloudinaryConfigured) {
+      console.warn('⚠️  Cloudinary not configured. Screenshots will be stored locally.');
+    } else {
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const emailOrId = req.user?.email || String(userId);
+        const customFolder = `ems/screenshots/${emailOrId}/${year}/${month}`;
+
+        const cloudinaryResult = await uploadToCloudinary(file.path, 'screenshots', customFolder);
+        if (cloudinaryResult) {
+          imageUrl = cloudinaryResult.secureUrl;
+          thumbnailUrl = getCloudinaryThumbnail(cloudinaryResult.secureUrl);
+          publicId = cloudinaryResult.publicId;
+          uploadedToCloud = true;
+          console.log(`✅ Screenshot uploaded to Cloudinary: ${publicId}`);
+        } else {
+          console.error('❌ Cloudinary uploadToCloudinary returned null — falling back to local storage.');
+        }
+      } catch (uploadError) {
+        // ⚠️ DO NOT delete the file here — fall back to local storage instead of returning 503
+        console.error('❌ Cloudinary upload error (falling back to local):', (uploadError as Error).message);
+        // imageUrl / thumbnailUrl already point to local path — we continue normally below
       }
-    } catch (uploadError) {
-      console.error('Failed to upload screenshot to Cloudinary, using local fallback:', uploadError);
     }
 
     const screenshot = await Screenshot.create({
@@ -55,6 +76,7 @@ export const agentScreenshot = async (req: AuthRequest, res: Response): Promise<
       tenantId,
       timestamp: new Date(),
       imageUrl,
+      publicId,
       thumbnailUrl,
       activeApp: activeApp || '',
       windowTitle: windowTitle || '',
@@ -62,6 +84,7 @@ export const agentScreenshot = async (req: AuthRequest, res: Response): Promise<
       metadata: {
         fileSize: file.size,
         format: path.extname(file.originalname).replace('.', ''),
+        uploadedToCloud,
       },
     });
 

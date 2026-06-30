@@ -192,10 +192,19 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
     'x-agent-key': localStorage.getItem('agentKey') || '',
   });
 
+  const customFetch = async (url: string, options: RequestInit = {}) => {
+    const res = await fetch(url, options);
+    if (res.status === 401) {
+      handleLogout();
+      throw new Error('Unauthorized');
+    }
+    return res;
+  };
+
   // Dynamic API fetchers
   const fetchTasks = async () => {
     try {
-      const res = await fetch(`${API_URL}/tasks`, { headers: headers() });
+      const res = await customFetch(`${API_URL}/tasks`, { headers: headers() });
       const data = await res.json();
       if (data.success && data.data) {
         setTasks(data.data);
@@ -207,7 +216,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   const fetchScreenshots = async () => {
     try {
-      const res = await fetch(`${API_URL}/screenshots?limit=4`, { headers: headers() });
+      const res = await customFetch(`${API_URL}/screenshots?limit=4`, { headers: headers() });
       const data = await res.json();
       if (data.success && data.data?.docs) {
         const host = API_URL.replace('/api', '');
@@ -228,7 +237,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   const fetchTimelineEvents = async () => {
     try {
-      const res = await fetch(`${API_URL}/activity?limit=6`, { headers: headers() });
+      const res = await customFetch(`${API_URL}/activity?limit=6`, { headers: headers() });
       const data = await res.json();
       if (data.success && data.data?.logs) {
         const events = data.data.logs.map((log: any) => {
@@ -254,7 +263,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   const fetchProjects = async () => {
     try {
-      const res = await fetch(`${API_URL}/projects`, { headers: headers() });
+      const res = await customFetch(`${API_URL}/projects`, { headers: headers() });
       const data = await res.json();
       if (data.success && data.data) {
         setProjects(data.data);
@@ -271,7 +280,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
     try {
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
-      const res = await fetch(`${API_URL}/activity/summary?startDate=${todayStart.toISOString()}`, { headers: headers() });
+      const res = await customFetch(`${API_URL}/activity/summary?startDate=${todayStart.toISOString()}`, { headers: headers() });
       const data = await res.json();
       if (data.success && data.data?.topApps) {
         setTopApps(data.data.topApps);
@@ -285,7 +294,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     (async () => {
       try {
-        const res  = await fetch(`${API_URL}/agent/status`, { headers: headers() });
+        const res  = await customFetch(`${API_URL}/agent/status`, { headers: headers() });
         const data = await res.json();
         if (data.success) {
           setTotalSec((data.data.totalWorkMinutes || 0) * 60);
@@ -446,7 +455,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   const handlePunch = async (type: 'in' | 'out') => {
     setError(''); setLoading(true);
     try {
-      const res  = await fetch(`${API_URL}/agent/punch-${type}`, {
+      const res  = await customFetch(`${API_URL}/agent/punch-${type}`, {
         method: 'POST', headers: headers(),
         body: JSON.stringify({ ip: '127.0.0.1' }),
       });
@@ -499,7 +508,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   const toggleTask = async (id: string, done: boolean) => {
     try {
-      const res = await fetch(`${API_URL}/tasks/${id}`, {
+      const res = await customFetch(`${API_URL}/tasks/${id}`, {
         method: 'PUT',
         headers: headers(),
         body: JSON.stringify({ done: !done })

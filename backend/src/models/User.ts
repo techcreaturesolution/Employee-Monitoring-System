@@ -79,9 +79,10 @@ const userSchema = new Schema<IUser>(
 );
 
 // ============ INDEXES ============
-// Each field appears in exactly ONE index definition to avoid duplicate warnings
-userSchema.index({ email: 1, tenantId: 1 }, { unique: true }); // unique per tenant
-userSchema.index({ tenantId: 1, status: 1 });                  // filter by tenant + status
+// IMPORTANT: Each top-level field key must appear in only ONE index object to avoid Mongoose
+// duplicate index warnings. Compound indexes are fine — just don’t repeat the same key.
+userSchema.index({ email: 1, tenantId: 1 }, { unique: true }); // unique per-tenant email + lookup by tenantId
+userSchema.index({ status: 1 });                               // filter employees by status
 userSchema.index({ agentKey: 1 }, { unique: true, sparse: true }); // desktop agent auth
 
 userSchema.pre('save', async function (next) {

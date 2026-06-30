@@ -200,7 +200,13 @@ function setupIpcListeners() {
   });
 
   ipcMain.handle('capture-screenshot', async () => {
-    return true;
+    try {
+      await agentService.captureScreenshot();
+      return true;
+    } catch (e) {
+      console.error('Manual screenshot capture failed:', e);
+      return false;
+    }
   });
 
   ipcMain.handle('track-activity', async (event, data) => {

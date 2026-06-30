@@ -1,4 +1,4 @@
-const { queueActivity, getUnsyncedActivities, markAsSynced, getApiUrl, queueScreenshot, getUnuploadedScreenshots, markScreenshotAsUploaded } = require('./storage.cjs');
+const { queueActivity, getUnsyncedActivities, markAsSynced, getApiUrl, queueScreenshot, getUnuploadedScreenshots, markScreenshotAsUploaded, getToken, getAgentKey } = require('./storage.cjs');
 const { app, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -26,14 +26,16 @@ class AgentService {
     if (!fs.existsSync(this.offlineScreenshotsDir)) fs.mkdirSync(this.offlineScreenshotsDir, { recursive: true });
     
     this.apiBaseUrl = getApiUrl();
-    this.token = null;
-    this.agentKey = null;
+    this.token = getToken() || null;
+    this.agentKey = getAgentKey() || null;
     
     this.accumulatedIdleSeconds = 0;
     this.isUserIdle = false;
     
     // Memory buffer for activities to avoid constant SQLite writes
     this.activityBuffer = [];
+    this.lastActivityLog = null;
+    this.activityStartTime = new Date();
 
     // Register Power Monitor events for Sleep / Hibernate / Lock
     powerMonitor.on('suspend', () => {
@@ -77,6 +79,7 @@ class AgentService {
     if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
     if (this.idleTimer) { clearInterval(this.idleTimer); this.idleTimer = null; }
     
+    this.flushCurrentActivity();
     // Flush remaining buffered memory activities to SQLite before stopping
     this.flushBufferToDb();
   }
@@ -165,19 +168,57 @@ class AgentService {
       const win = await activeWin();
       if (!win) return;
       
-      const activity = {
-        appName: win.owner?.name || 'Unknown',
-        windowTitle: win.title || '',
+      const currentAppName = win.owner?.name || 'Unknown';
+      const currentWindowTitle = win.title || '';
+      
+      // Detect activity change
+      const activityChanged = 
+        !this.lastActivityLog ||
+        this.lastActivityLog.appName !== currentAppName ||
+        this.lastActivityLog.windowTitle !== currentWindowTitle;
+      
+      if (activityChanged && this.lastActivityLog) {
+        // Calculate actual duration of PREVIOUS activity
+        const now = new Date();
+        const durationMinutes = (now.getTime() - this.activityStartTime.getTime()) / (1000 * 60);
+        
+        const completedActivity = {
+          ...this.lastActivityLog,
+          durationMinutes: Math.round(durationMinutes * 100) / 100,  // Round to 2 decimals
+          endTime: new Date().toISOString()
+        };
+        
+        this.activityBuffer.push(completedActivity);
+        this.activityStartTime = new Date();
+      }
+      
+      // Store current activity for next comparison
+      this.lastActivityLog = {
+        appName: currentAppName,
+        windowTitle: currentWindowTitle,
         url: win.url || '',
-        startTime: new Date().toISOString(),
-        durationMinutes: this.activityInterval / 60000,
-        category: this.isUserIdle ? 'idle' : 'productive' // base classification
+        startTime: this.activityStartTime.toISOString(),
+        category: this.isUserIdle ? 'idle' : 'productive'
       };
       
-      // Store in memory queue to prevent constant disk I/O
-      this.activityBuffer.push(activity);
     } catch (e) {
       console.error('Failed to track activity', e);
+    }
+  }
+
+  flushCurrentActivity() {
+    if (this.lastActivityLog && this.activityStartTime) {
+      const now = new Date();
+      const durationMinutes = (now.getTime() - this.activityStartTime.getTime()) / (1000 * 60);
+      
+      const finalActivity = {
+        ...this.lastActivityLog,
+        durationMinutes: Math.round(durationMinutes * 100) / 100,
+        endTime: new Date().toISOString()
+      };
+      
+      this.activityBuffer.push(finalActivity);
+      this.lastActivityLog = null;
     }
   }
 
@@ -252,6 +293,7 @@ class AgentService {
       const localUnsynced = await getUnsyncedActivities();
       const localParsed = localUnsynced.map(r => JSON.parse(r.data));
       
+      this.flushCurrentActivity();
       // Merge memory buffer into sync payload
       const buffered = [...this.activityBuffer];
       const mergedActivities = [...localParsed, ...buffered];
@@ -306,16 +348,27 @@ class AgentService {
               ...formData.getHeaders(),
               'Authorization': `Bearer ${this.token}`,
               'x-agent-key': this.agentKey || ''
-            }
+            },
+            timeout: 30000, // 30-second timeout so one slow upload doesn't block the queue
           });
 
           if (res.data.success) {
-            fs.unlinkSync(s.filePath);
+            if (fs.existsSync(s.filePath)) fs.unlinkSync(s.filePath);
             await markScreenshotAsUploaded([s.id]);
+          } else {
+            // Server responded but flagged failure — skip this one and continue
+            console.warn(`Screenshot ${s.id} rejected by server, skipping.`);
           }
         } catch (uploadErr) {
-          console.error(`Failed to upload queued screenshot ${s.id}:`, uploadErr.message);
-          break; // Stop syncing remaining if network is still down
+          const isNetworkDown = uploadErr.code && 
+            ['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENETUNREACH', 'ENOTFOUND'].includes(uploadErr.code);
+          if (isNetworkDown) {
+            // Server/network is down — stop retrying entire batch until next sync cycle
+            console.error(`Network error uploading screenshot ${s.id}, pausing queue:`, uploadErr.message);
+            break;
+          }
+          // Server error (4xx/5xx) — skip this screenshot and continue with the rest
+          console.error(`Failed to upload queued screenshot ${s.id} (will retry next cycle):`, uploadErr.message);
         }
       }
     } catch (e) {

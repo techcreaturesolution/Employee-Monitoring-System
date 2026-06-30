@@ -1,6 +1,33 @@
 import mongoose from 'mongoose';
 import { config } from './index';
 
+import fs from 'fs';
+import path from 'path';
+import { Screenshot } from '../models/Screenshot';
+
+const pruneBrokenScreenshots = async (): Promise<void> => {
+  try {
+    const screenshots = await Screenshot.find({ imageUrl: { $regex: /^\/uploads/ } });
+    let deletedCount = 0;
+
+    for (const ss of screenshots) {
+      const relativePath = ss.imageUrl.replace(/^\/uploads/, '');
+      const filePath = path.join(path.resolve(config.upload.dir), relativePath);
+
+      if (!fs.existsSync(filePath)) {
+        await Screenshot.findByIdAndDelete(ss._id);
+        deletedCount++;
+      }
+    }
+
+    if (deletedCount > 0) {
+      console.log(`🧹 Cleaned up ${deletedCount} broken screenshot database entries (files missing on disk).`);
+    }
+  } catch (error) {
+    console.error('❌ Failed to prune broken screenshots:', error);
+  }
+};
+
 export const connectDatabase = async (): Promise<void> => {
   try {
     const conn = await mongoose.connect(config.mongodbUri, {
@@ -25,6 +52,7 @@ export const connectDatabase = async (): Promise<void> => {
     });
 
     console.log(`✅  MongoDB connected  →  ${conn.connection.host}`);
+    await pruneBrokenScreenshots();
   } catch (error) {
     console.error('❌  MongoDB connection failed:', (error as Error).message);
     console.error('   Check that MongoDB is running and MONGODB_URI is correct in .env');

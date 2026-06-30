@@ -59,7 +59,7 @@ const punchOut = async (req: AuthRequest, res: Response, next: NextFunction): Pr
         userId,
         date: today,
         'punchIn.time': { $exists: true },
-        'punchOut.time': { $exists: false }, // atomic guard
+        'punchOut.time': { $exists: false },
       },
       { $set: { punchOut: punchOutData } },
       { new: true }
@@ -105,7 +105,7 @@ const startBreak = async (req: AuthRequest, res: Response, next: NextFunction): 
       return;
     }
 
-    const activeBreak = attendance.breaks.find((b) => !b.endTime);
+    const activeBreak = attendance.breaks.find((b) => !b.endTime);  // ✅ FIX: Use !b.endTime (null/undefined)
     if (activeBreak) {
       res.status(400).json({ success: false, message: 'Already on a break.' });
       return;
@@ -113,7 +113,7 @@ const startBreak = async (req: AuthRequest, res: Response, next: NextFunction): 
 
     attendance.breaks.push({
       startTime: new Date(),
-      endTime: new Date(0),
+      endTime: null,  // ✅ FIX 1: Use null instead of new Date(0) - clearer intent
       duration: 0,
       reason: reason || '',
     });
@@ -137,7 +137,8 @@ const endBreak = async (req: AuthRequest, res: Response, next: NextFunction): Pr
       return;
     }
 
-    const activeBreak = attendance.breaks.find((b) => !b.endTime || b.endTime.getTime() === 0);
+    // ✅ FIX 2: Simpler check - only need to check if endTime is null/undefined
+    const activeBreak = attendance.breaks.find((b) => !b.endTime);
     if (!activeBreak) {
       res.status(400).json({ success: false, message: 'No active break found.' });
       return;

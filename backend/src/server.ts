@@ -30,11 +30,35 @@ if (config.nodeEnv === 'production' && process.env.SENTRY_DSN) {
   });
 }
 
+// Build the allowed origins list from env + hardcoded defaults
+// Mobile apps (Flutter/React Native) send requests with no Origin header — !origin allows them
+const buildAllowedOrigins = () => {
+  const origins = [
+    config.frontendUrl,
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:5173',
+  ];
+  // Support comma-separated additional origins from env (e.g. deployed frontend URL)
+  if (process.env.ADDITIONAL_ALLOWED_ORIGINS) {
+    process.env.ADDITIONAL_ALLOWED_ORIGINS.split(',').forEach((o) => origins.push(o.trim()));
+  }
+  return origins;
+};
+
+const isOriginAllowed = (origin: string | undefined): boolean => {
+  if (!origin) return true; // Mobile apps / curl / server-to-server — no origin = allow
+  if (origin === 'null') return true; // Capacitor / Cordova send literal "null"
+  if (origin.startsWith('file://')) return true; // Electron / desktop webview
+  if (origin.startsWith('capacitor://')) return true; // Capacitor iOS/Android
+  if (origin.startsWith('ionic://')) return true; // Ionic
+  return buildAllowedOrigins().includes(origin);
+};
+
 const io = new SocketServer(httpServer, {
   cors: {
     origin: function (origin, callback) {
-      const allowedOrigins = [config.frontendUrl, 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:5173', 'file://'];
-      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('file://')) {
+      if (isOriginAllowed(origin)) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -46,10 +70,9 @@ const io = new SocketServer(httpServer, {
 });
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-const allowedOrigins = [config.frontendUrl, 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:5173', 'file://'];
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || origin.startsWith('file://')) {
+    if (isOriginAllowed(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -118,6 +141,10 @@ app.use('/api/', generalLimiter);
 app.use('/uploads', express.static(path.resolve(config.upload.dir)));
 
 app.get('/api/health', (_req, res) => {
+  res.json({ success: true, message: 'Employee Monitoring System API is running', timestamp: new Date().toISOString() });
+});
+
+app.get('/health', (_req, res) => {
   res.json({ success: true, message: 'Employee Monitoring System API is running', timestamp: new Date().toISOString() });
 });
 

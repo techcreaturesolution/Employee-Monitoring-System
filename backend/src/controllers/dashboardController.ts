@@ -1,3 +1,6 @@
+// FIXED VERSION: backend/src/controllers/dashboardController.ts
+// This version correctly calculates absent employee count and other metrics
+
 import { Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import { User } from '../models/User';
@@ -21,15 +24,19 @@ const getAdminDashboard = async (req: AuthRequest, res: Response, next: NextFunc
     const [
       totalEmployees,
       activeEmployees,
-      todayAttendance,
+      todayAttendanceRecords,
       todayScreenshots,
       onlineNow,
       recentScreenshots,
       attendanceStats,
+      // ✅ FIX 1: Get actual count of absent employees (not just records)
+      todayAbsentCount,
+      todayPresentCount,
+      todayLateCount,
     ] = await Promise.all([
       User.countDocuments({ tenantId: tenantObjId, role: { $ne: 'super_admin' } }),
       User.countDocuments({ tenantId: tenantObjId, status: 'active', role: { $ne: 'super_admin' } }),
-      Attendance.countDocuments({ tenantId: tenantObjId, date: today }),
+      Attendance.countDocuments({ tenantId: tenantObjId, date: today }),  // Total records
       Screenshot.countDocuments({ tenantId: tenantObjId, timestamp: { $gte: new Date(today) } }),
       User.countDocuments({ tenantId: tenantObjId, isOnline: true }),
       Screenshot.find({ tenantId: tenantObjId })
@@ -45,6 +52,12 @@ const getAdminDashboard = async (req: AuthRequest, res: Response, next: NextFunc
           },
         },
       ]),
+      // ✅ FIX 2: Count records with actual status = 'absent'
+      Attendance.countDocuments({ tenantId: tenantObjId, date: today, status: 'absent' }),
+      // ✅ FIX 3: Count records with status = 'present'
+      Attendance.countDocuments({ tenantId: tenantObjId, date: today, status: 'present' }),
+      // ✅ FIX 4: Count records with status = 'late'
+      Attendance.countDocuments({ tenantId: tenantObjId, date: today, status: 'late' }),
     ]);
 
     // Get attendance for last 7 days in ONE query
@@ -105,14 +118,21 @@ const getAdminDashboard = async (req: AuthRequest, res: Response, next: NextFunc
       },
     ]);
 
+    // ✅ FIX 5: Correct calculation logic
+    // Employees who have not marked attendance yet
+    const notMarkedAttendance = activeEmployees - todayAttendanceRecords;
+
     res.json({
       success: true,
       data: {
         stats: {
           totalEmployees,
           activeEmployees,
-          todayPresent: todayAttendance,
-          todayAbsent: activeEmployees - todayAttendance,
+          // ✅ FIX 6: Use actual status counts instead of calculation
+          todayPresent: todayPresentCount,
+          todayLate: todayLateCount,
+          todayAbsent: todayAbsentCount,
+          notMarked: notMarkedAttendance,  // New: employees who haven't punched in/out
           todayScreenshots,
           onlineNow,
         },

@@ -16,7 +16,21 @@ if (isCloudinaryConfigured) {
     api_key: config.cloudinary.apiKey,
     api_secret: config.cloudinary.apiSecret,
   });
-  logger.info('Cloudinary initialized successfully.');
+  logger.info(`Cloudinary configured with cloud_name="${config.cloudinary.cloudName}". Running connectivity test...`);
+
+  // Verify credentials work at startup
+  (async () => {
+    try {
+      await cloudinary.api.ping();
+      logger.info('✅ Cloudinary connection verified successfully.');
+    } catch (err: unknown) {
+      const msg = (err as { message?: string }).message || String(err);
+      logger.error(`❌ Cloudinary credential test FAILED: ${msg}`);
+      logger.error(`   Cloud Name used: "${config.cloudinary.cloudName}"`);
+      logger.error('   Fix: Go to https://cloudinary.com/console and copy the exact cloud name (lowercase, as shown on the dashboard).');
+      logger.error('   Then update CLOUDINARY_CLOUD_NAME in your .env file and restart the server.');
+    }
+  })();
 } else {
   logger.warn('Cloudinary credentials not provided. Storing files locally.');
 }
@@ -27,20 +41,25 @@ export { isCloudinaryConfigured };
  * Uploads a local file to Cloudinary and deletes the local file afterward.
  * @param filePath Path to the local file
  * @param folder Cloudinary folder name (e.g. 'screenshots', 'avatars')
+ * @param customFolder Optional custom path to store files in
  * @returns Object with secure_url and public_id, or null if Cloudinary is not configured.
  */
 export const uploadToCloudinary = async (
   filePath: string,
-  folder: string
+  folder: string,
+  customFolder?: string
 ): Promise<{ secureUrl: string; publicId: string } | null> => {
   if (!isCloudinaryConfigured) {
     return null;
   }
 
   try {
+    const uploadFolder = customFolder ? customFolder : `ems/${folder}`;
     const result = await cloudinary.uploader.upload(filePath, {
-      folder: `ems/${folder}`,
+      folder: uploadFolder,
       resource_type: 'image',
+      quality: 'auto',
+      fetch_format: 'auto',
     });
 
     // Delete local file after upload
@@ -54,15 +73,28 @@ export const uploadToCloudinary = async (
     };
   } catch (error) {
     logger.error('Failed to upload file to Cloudinary:', error);
-    // Even if upload fails, clean up local file
-    if (fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath);
-      } catch (err) {
-        logger.error('Failed to delete local file after failed upload:', err);
-      }
-    }
     throw error;
+  }
+};
+
+/**
+ * Deletes a file from Cloudinary by its public ID.
+ * @param publicId Cloudinary asset public ID
+ * @returns boolean indicating success status of deletion
+ */
+export const deleteFromCloudinary = async (
+  publicId: string
+): Promise<boolean> => {
+  if (!isCloudinaryConfigured || !publicId) {
+    return false;
+  }
+
+  try {
+    const result = await cloudinary.uploader.destroy(publicId);
+    return result.result === 'ok';
+  } catch (error) {
+    logger.error('Failed to delete file from Cloudinary:', error);
+    return false;
   }
 };
 

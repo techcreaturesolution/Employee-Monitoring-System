@@ -3,8 +3,10 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiService {
-  // Change this to your backend server URL
-  static const String baseUrl = 'http://10.0.2.2:5000/api';
+  // Production: deployed Render backend URL
+  // Development (Android emulator): use 'http://10.0.2.2:5000/api'
+  // Development (physical device): use 'http://<YOUR_LOCAL_IP>:5000/api'
+  static const String baseUrl = 'https://employee-monitoring-system-z5kk.onrender.com/api';
   static const _storage = FlutterSecureStorage();
 
   String? _token;
