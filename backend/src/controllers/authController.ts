@@ -7,6 +7,7 @@ import { registerSchema, loginSchema } from '../validators/authValidator';
 import { z } from 'zod';
 import { config } from '../config';
 import { logger } from '../utils/logger';
+import { uploadToCloudinary } from '../utils/cloudinary';
 
 const register = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -55,7 +56,7 @@ const register = async (req: Request, res: Response, next: NextFunction): Promis
     res.cookie('ems_token', accessToken, {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
-      sameSite: 'strict',
+      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/',
     });
@@ -63,7 +64,7 @@ const register = async (req: Request, res: Response, next: NextFunction): Promis
     res.cookie('ems_refresh_token', refreshToken, {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
-      sameSite: 'strict',
+      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       path: '/',
     });
@@ -164,7 +165,7 @@ const login = async (req: Request, res: Response, next: NextFunction): Promise<v
     res.cookie('ems_token', accessToken, {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
-      sameSite: 'strict',
+      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/',
     });
@@ -172,7 +173,7 @@ const login = async (req: Request, res: Response, next: NextFunction): Promise<v
     res.cookie('ems_refresh_token', refreshToken, {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
-      sameSite: 'strict',
+      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       path: '/',
     });
@@ -303,8 +304,8 @@ const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction
 
 const logout = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    res.clearCookie('ems_token', { path: '/', httpOnly: true, secure: config.nodeEnv === 'production', sameSite: 'strict' });
-    res.clearCookie('ems_refresh_token', { path: '/', httpOnly: true, secure: config.nodeEnv === 'production', sameSite: 'strict' });
+    res.clearCookie('ems_token', { path: '/', httpOnly: true, secure: config.nodeEnv === 'production', sameSite: config.nodeEnv === 'production' ? 'none' : 'lax' });
+    res.clearCookie('ems_refresh_token', { path: '/', httpOnly: true, secure: config.nodeEnv === 'production', sameSite: config.nodeEnv === 'production' ? 'none' : 'lax' });
     res.json({ success: true, message: 'Logged out successfully.' });
   } catch (error) {
     logger.error('Logout failed:', error);
@@ -312,4 +313,44 @@ const logout = async (req: AuthRequest, res: Response, next: NextFunction): Prom
   }
 };
 
-export { register, login, getMe, updateProfile, logout };
+const uploadAvatarController = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Not authenticated.' });
+      return;
+    }
+
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ success: false, message: 'No file provided.' });
+      return;
+    }
+
+    let avatarUrl = `/uploads/avatars/${file.filename}`;
+
+    try {
+      const cloudinaryResult = await uploadToCloudinary(file.path, 'avatars');
+      if (cloudinaryResult) {
+        avatarUrl = cloudinaryResult.secureUrl;
+      }
+    } catch (uploadError) {
+      logger.error('Failed to upload avatar to Cloudinary, using local fallback:', uploadError);
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(user._id, { avatar: avatarUrl }, { new: true });
+
+    res.json({
+      success: true,
+      message: 'Avatar uploaded successfully.',
+      data: {
+        avatar: updatedUser?.avatar,
+      },
+    });
+  } catch (error) {
+    logger.error('Avatar upload failed:', error);
+    next(error);
+  }
+};
+
+export { register, login, getMe, updateProfile, logout, uploadAvatarController };

@@ -18,6 +18,7 @@ import compression from 'compression';
 import { logger } from './utils/logger';
 
 const app = express();
+app.set('trust proxy', 1);
 const httpServer = createServer(app);
 
 // Initialize Sentry
