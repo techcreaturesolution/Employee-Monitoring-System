@@ -45,6 +45,7 @@
   "build": {
     "appId": "com.ems.agent",
     "productName": "EMSAgent",
+    "npmRebuild": false,
     "directories": {
       "output": "dist-packaged"
     },
