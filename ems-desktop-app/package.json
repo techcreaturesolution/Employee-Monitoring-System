@@ -46,6 +46,11 @@
     "appId": "com.ems.agent",
     "productName": "EMSAgent",
     "npmRebuild": false,
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/screenshot-desktop/**/*",
+      "**/node_modules/active-win/**/*"
+    ],
     "directories": {
       "output": "dist-packaged"
     },

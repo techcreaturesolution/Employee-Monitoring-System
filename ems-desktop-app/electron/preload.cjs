@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  setToken: (token, agentKey) => ipcRenderer.invoke('set-token', token, agentKey),
+  setToken: (token, agentKey, apiUrl) => ipcRenderer.invoke('set-token', token, agentKey, apiUrl),
   getToken: () => ipcRenderer.invoke('get-token'),
   getAgentKey: () => ipcRenderer.invoke('get-agent-key'),
   clearTokens: () => ipcRenderer.invoke('clear-tokens'),

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { dashboardAPI } from '../services/api';
+import { dashboardAPI, getFullImageUrl } from '../services/api';
 import { DashboardStats, Screenshot } from '../types';
 import {
   Users,
@@ -167,7 +167,7 @@ const Dashboard: React.FC = () => {
                 {recentScreenshots.map((ss) => (
                   <div key={ss._id} className="relative group rounded-lg overflow-hidden border">
                     <img
-                      src={ss.imageUrl}
+                      src={getFullImageUrl(ss.imageUrl)}
                       alt={ss.windowTitle || 'Screenshot'}
                       className="w-full h-32 object-cover"
                     />

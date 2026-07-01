@@ -165,9 +165,12 @@ function setupIpcListeners() {
     }
   });
 
-  ipcMain.handle('set-token', async (event, token, agentKey) => {
+  ipcMain.handle('set-token', async (event, token, agentKey, apiUrl) => {
     const storage = require('./storage.cjs');
     storage.setToken(token, agentKey);
+    if (apiUrl) {
+      storage.setApiUrl(apiUrl);
+    }
     agentService.setToken(token, agentKey);
     return true;
   });

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { screenshotAPI } from '../services/api';
+import { screenshotAPI, getFullImageUrl } from '../services/api';
 import { Screenshot, Pagination } from '../types';
 import { Camera, X, Trash2, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
@@ -91,7 +91,7 @@ const Screenshots: React.FC = () => {
             >
               <div className="relative cursor-pointer" onClick={() => setSelectedImage(ss)}>
                 <img
-                  src={ss.imageUrl}
+                  src={getFullImageUrl(ss.imageUrl)}
                   alt={ss.windowTitle || 'Screenshot'}
                   className="w-full h-44 object-cover"
                 />
@@ -155,7 +155,7 @@ const Screenshots: React.FC = () => {
             <button onClick={() => setSelectedImage(null)} className="absolute -top-10 right-0 text-white hover:text-slate-300">
               <X className="w-6 h-6" />
             </button>
-            <img src={selectedImage.imageUrl} alt={selectedImage.windowTitle} className="w-full rounded-lg" />
+            <img src={getFullImageUrl(selectedImage.imageUrl)} alt={selectedImage.windowTitle} className="w-full rounded-lg" />
             <div className="bg-white p-4 rounded-b-lg">
               <p className="font-medium">{selectedImage.activeApp || 'Unknown App'}</p>
               <p className="text-sm text-slate-500">{selectedImage.windowTitle}</p>

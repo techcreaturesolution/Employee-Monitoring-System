@@ -3,6 +3,8 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import './index.css';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -12,7 +14,7 @@ function App() {
     if (token) {
       setIsAuthenticated(true);
       if ((window as any).electronAPI && agentKey) {
-        (window as any).electronAPI.setToken(token, agentKey);
+        (window as any).electronAPI.setToken(token, agentKey, API_URL);
       }
     }
   }, []);

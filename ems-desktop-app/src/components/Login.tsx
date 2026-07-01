@@ -33,7 +33,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
       });
       const data = await res.json();
       if (data.success) {
-        if (eAPI()) await eAPI().setToken(data.data.accessToken, data.data.user.agentKey);
+        if (eAPI()) await eAPI().setToken(data.data.accessToken, data.data.user.agentKey, API_URL);
         localStorage.setItem('token',    data.data.accessToken);
         localStorage.setItem('agentKey', data.data.user.agentKey);
         localStorage.setItem('user',     JSON.stringify(data.data.user));
