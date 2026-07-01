@@ -54,13 +54,21 @@ export const agentScreenshot = async (req: AuthRequest, res: Response): Promise<
         const emailOrId = req.user?.email || String(userId);
         const customFolder = `ems/screenshots/${emailOrId}/${year}/${month}`;
 
-        const cloudinaryResult = await uploadToCloudinary(file.path, 'screenshots', customFolder);
+        // IMPORTANT: Use absolute path — relative paths like './uploads/...' fail on Render
+        const absoluteFilePath = path.resolve(file.path);
+        console.log(`📤 Uploading screenshot to Cloudinary...`);
+        console.log(`   File path : ${absoluteFilePath}`);
+        console.log(`   File exists: ${require('fs').existsSync(absoluteFilePath)}`);
+        console.log(`   Cloud folder: ${customFolder}`);
+
+        const cloudinaryResult = await uploadToCloudinary(absoluteFilePath, 'screenshots', customFolder);
         if (cloudinaryResult) {
           imageUrl = cloudinaryResult.secureUrl;
           thumbnailUrl = getCloudinaryThumbnail(cloudinaryResult.secureUrl);
           publicId = cloudinaryResult.publicId;
           uploadedToCloud = true;
           console.log(`✅ Screenshot uploaded to Cloudinary: ${publicId}`);
+          console.log(`   URL: ${imageUrl}`);
         } else {
           console.error('❌ Cloudinary uploadToCloudinary returned null — falling back to local storage.');
         }

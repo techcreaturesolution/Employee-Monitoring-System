@@ -2,7 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IBreak {
   startTime: Date;
-  endTime: Date;
+  endTime?: Date; // optional – not set until break ends
   duration: number;
   reason: string;
 }

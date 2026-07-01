@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "lint": "eslint src/ --ext .ts",
-    "seed": "ts-node src/scripts/seed.ts"
+    "seed": "ts-node src/scripts/seed.ts",
+    "seed:keywords": "ts-node src/scripts/seedProductivityKeywords.ts"
   },
   "dependencies": {
     "@sentry/node": "^10.62.0",

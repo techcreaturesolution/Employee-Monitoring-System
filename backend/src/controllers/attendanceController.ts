@@ -113,7 +113,7 @@ const startBreak = async (req: AuthRequest, res: Response, next: NextFunction): 
 
     attendance.breaks.push({
       startTime: new Date(),
-      endTime: null,  // ✅ FIX 1: Use null instead of new Date(0) - clearer intent
+      endTime: undefined,  // ✅ FIX 1: Use undefined for optional Date field (null not assignable to Date)
       duration: 0,
       reason: reason || '',
     });

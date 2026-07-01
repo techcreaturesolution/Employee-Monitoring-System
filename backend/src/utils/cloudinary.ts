@@ -72,7 +72,11 @@ export const uploadToCloudinary = async (
       publicId: result.public_id,
     };
   } catch (error) {
-    logger.error('Failed to upload file to Cloudinary:', error);
+    const err = error as any;
+    const detail = err?.error?.message || err?.message || String(error);
+    const httpCode = err?.http_code || err?.status || '';
+    logger.error(`Failed to upload file to Cloudinary: [${httpCode}] ${detail}`);
+    logger.error(`  File path: ${filePath}`);
     throw error;
   }
 };

@@ -61,15 +61,50 @@ class AgentService {
     this.agentKey = agentKey;
   }
 
+  // ── Wait for backend to be reachable before starting timers ──────────────────
+  async waitForBackend(maxAttempts = 5, delayMs = 2000) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const http = require('http');
+        await new Promise((resolve, reject) => {
+          const url = new URL(this.apiBaseUrl);
+          const req = http.get({
+            hostname: url.hostname,
+            port: url.port || 5000,
+            path: '/api/health',
+            timeout: 3000,
+          }, (res) => {
+            resolve(res.statusCode);
+          });
+          req.on('error', reject);
+          req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+        });
+        console.log(`[Agent] Backend reachable on attempt ${attempt}`);
+        return true;
+      } catch {
+        if (attempt < maxAttempts) {
+          console.log(`[Agent] Backend not ready (attempt ${attempt}/${maxAttempts}), retrying in ${delayMs}ms...`);
+          await new Promise(r => setTimeout(r, delayMs));
+        }
+      }
+    }
+    console.warn('[Agent] Backend unreachable after all retries — will keep retrying on each sync cycle');
+    return false;
+  }
+
   start() {
     console.log('Agent starting background tasks...');
     this.stop(); // Clear any existing intervals first to avoid duplicate timers
     
-    this.activityTimer = setInterval(() => this.trackActivity(), this.activityInterval);
-    this.screenshotTimer = setInterval(() => this.captureScreenshot(), this.screenshotInterval);
-    this.syncTimer = setInterval(() => this.syncData(), this.syncInterval);
-    this.heartbeatTimer = setInterval(() => this.sendHeartbeat(), this.heartbeatInterval);
-    this.idleTimer = setInterval(() => this.checkIdle(), this.idleInterval);
+    // Wait for backend to be ready before firing heartbeats/sync
+    // (avoids ECONNREFUSED flood during initial app startup)
+    this.waitForBackend(5, 2000).then(() => {
+      this.activityTimer = setInterval(() => this.trackActivity(), this.activityInterval);
+      this.screenshotTimer = setInterval(() => this.captureScreenshot(), this.screenshotInterval);
+      this.syncTimer = setInterval(() => this.syncData(), this.syncInterval);
+      this.heartbeatTimer = setInterval(() => this.sendHeartbeat(), this.heartbeatInterval);
+      this.idleTimer = setInterval(() => this.checkIdle(), this.idleInterval);
+    });
   }
 
   stop() {
@@ -155,10 +190,16 @@ class AgentService {
         headers: { 
           'Authorization': `Bearer ${this.token}`,
           'x-agent-key': this.agentKey || ''
-        }
+        },
+        timeout: 5000,
       });
     } catch (e) {
-      console.error('Heartbeat failed', e.message);
+      // Only log if not a simple 'backend not ready' ECONNREFUSED
+      if (e.code !== 'ECONNREFUSED') {
+        console.error('Heartbeat failed', e.message);
+      } else {
+        console.warn('[Agent] Heartbeat skipped — backend not reachable (offline mode)');
+      }
     }
   }
 
@@ -322,7 +363,12 @@ class AgentService {
         }
       }
     } catch (e) {
-      console.error('Activity sync failed, saving memory buffer to disk:', e.message);
+      // Distinguish offline from real error
+      if (e.code === 'ECONNREFUSED') {
+        console.warn('[Agent] Activity sync skipped — backend offline, buffering to disk');
+      } else {
+        console.error('Activity sync failed, saving memory buffer to disk:', e.message);
+      }
       await this.flushBufferToDb();
     }
 

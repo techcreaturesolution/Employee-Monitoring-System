@@ -12,6 +12,7 @@ import agentRoutes from './agentRoutes';
 import locationRoutes from './locationRoutes';
 import mobileRoutes from './mobileRoutes';
 import taskRoutes from './taskRoutes';
+import productivityRoutes from './productivityRoutes';
 
 const router = Router();
 
@@ -28,5 +29,6 @@ router.use('/agent', agentRoutes);
 router.use('/location', locationRoutes);
 router.use('/mobile', mobileRoutes);
 router.use('/tasks', taskRoutes);
+router.use('/productivity', productivityRoutes);
 
 export default router;

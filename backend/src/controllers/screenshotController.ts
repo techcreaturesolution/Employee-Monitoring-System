@@ -1,5 +1,5 @@
 // FIXED VERSION: backend/src/controllers/screenshotController.ts
-// This version properly handles Cloudinary upload failures and validates configuration
+// Cloudinary upload with exponential-backoff retry + graceful local fallback
 
 import { Response, NextFunction } from 'express';
 import { Screenshot } from '../models/Screenshot';
@@ -11,7 +11,30 @@ import { config } from '../config';
 import { logger } from '../utils/logger';
 import { uploadToCloudinary, getCloudinaryThumbnail, deleteFromCloudinary, isCloudinaryConfigured } from '../utils/cloudinary';
 
+// ── Retry helper: exponential backoff ────────────────────────────────────────
+const uploadWithRetry = async (
+  filePath: string,
+  folder: string,
+  customFolder: string,
+  maxRetries: number = 3
+): Promise<{ secureUrl: string; publicId: string; bytes?: number } | null> => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      logger.info(`[Attempt ${attempt}/${maxRetries}] Uploading to Cloudinary...`);
+      const result = await uploadToCloudinary(filePath, folder, customFolder);
+      return result as { secureUrl: string; publicId: string; bytes?: number } | null;
+    } catch (err) {
+      if (attempt === maxRetries) throw err;
+      const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+      logger.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  return null;
+};
+
 const uploadScreenshot = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  const requestId = `req_${Date.now()}`;
   try {
     const userId = req.user?._id;
     const tenantId = req.user?.tenantId;
@@ -22,17 +45,8 @@ const uploadScreenshot = async (req: AuthRequest, res: Response, next: NextFunct
       return;
     }
 
-    // ✅ FIX 1: Validate Cloudinary configuration at request time
     if (!isCloudinaryConfigured) {
-      logger.warn('⚠️  Cloudinary is not configured. Ensure these env vars are set:');
-      logger.warn('   - CLOUDINARY_CLOUD_NAME');
-      logger.warn('   - CLOUDINARY_API_KEY');
-      logger.warn('   - CLOUDINARY_API_SECRET');
-      
-      // Decide: Fail the request or allow local fallback
-      // Currently allowing fallback (if you prefer, reject with 503)
-      // res.status(503).json({ success: false, message: 'Cloud storage service not configured.' });
-      // return;
+      logger.warn(`[${requestId}] ⚠️  Cloudinary not configured – using local storage fallback.`);
     }
 
     const { activeApp, windowTitle, productivityTag } = req.body;
@@ -41,8 +55,8 @@ const uploadScreenshot = async (req: AuthRequest, res: Response, next: NextFunct
     let thumbnailUrl = `/uploads/screenshots/${file.filename}`;
     let publicId = '';
     let uploadedToCloud = false;
+    let cloudWarning: string | undefined;
 
-    // ✅ FIX 2: Explicit Cloudinary upload with proper error handling
     if (isCloudinaryConfigured) {
       try {
         const now = new Date();
@@ -51,38 +65,30 @@ const uploadScreenshot = async (req: AuthRequest, res: Response, next: NextFunct
         const emailOrId = req.user?.email || String(userId);
         const customFolder = `ems/screenshots/${emailOrId}/${year}/${month}`;
 
-        const cloudinaryResult = await uploadToCloudinary(file.path, 'screenshots', customFolder);
-        
+        logger.info(`[${requestId}] Uploading to Cloudinary folder: ${customFolder}`);
+        const cloudinaryResult = await uploadWithRetry(file.path, 'screenshots', customFolder, 3);
+
         if (cloudinaryResult) {
           imageUrl = cloudinaryResult.secureUrl;
           thumbnailUrl = getCloudinaryThumbnail(cloudinaryResult.secureUrl);
           publicId = cloudinaryResult.publicId;
           uploadedToCloud = true;
-          logger.info(`✅ Screenshot uploaded to Cloudinary: ${publicId}`);
+          logger.info(`[${requestId}] ✅ Cloudinary upload successful: ${publicId}`);
         } else {
-          logger.error('⚠️  Cloudinary returned null. Check credentials.');
+          cloudWarning = 'Cloudinary returned empty response – using local storage.';
+          logger.error(`[${requestId}] ${cloudWarning}`);
         }
       } catch (uploadError) {
-        logger.error('❌ Failed to upload screenshot to Cloudinary:', uploadError);
-        // ✅ FIX 3: Clean up local file if Cloudinary fails
-        if (fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
-          logger.info(`Cleaned up temporary file: ${file.path}`);
-        }
-        // Don't fall back to local storage if Cloudinary is configured but fails
-        // This is more explicit about storage issues
-        res.status(503).json({ 
-          success: false, 
-          message: 'Cloud storage upload failed. Please try again.' 
-        });
-        return;
+        const errMsg = uploadError instanceof Error ? uploadError.message : String(uploadError);
+        cloudWarning = `Cloudinary upload failed after retries: ${errMsg}. Stored locally.`;
+        logger.error(`[${requestId}] ❌ ${cloudWarning}`);
+        // Keep local fallback url; do NOT delete the file
       }
     } else {
-      // ✅ FIX 4: Log when falling back to local storage (no Cloudinary configured)
-      logger.info(`📁 Using local storage for screenshot (Cloudinary not configured): ${file.filename}`);
+      logger.info(`[${requestId}] 📁 Local storage: ${file.filename}`);
     }
 
-    // ✅ FIX 5: Record whether screenshot is in cloud or local
+    // ── Save to database ───────────────────────────────────────────────────────
     const screenshot = await Screenshot.create({
       userId,
       tenantId,
@@ -94,17 +100,20 @@ const uploadScreenshot = async (req: AuthRequest, res: Response, next: NextFunct
       windowTitle: windowTitle || '',
       productivityTag: productivityTag || 'neutral',
       metadata: {
-        resolution: '',
+        resolution: req.body.resolution || '',
         fileSize: file.size,
-        format: path.extname(file.originalname).replace('.', ''),
-        uploadedToCloud,  // Track where it's stored
+        format: path.extname(file.originalname).replace('.', '') || 'png',
+        uploadedToCloud,
       },
     });
 
-    res.status(201).json({ 
-      success: true, 
-      message: `Screenshot uploaded${uploadedToCloud ? ' to Cloudinary' : ' locally'}.`, 
-      data: screenshot 
+    logger.info(`[${requestId}] Screenshot saved to DB: ${screenshot._id}`);
+
+    res.status(201).json({
+      success: true,
+      message: `Screenshot uploaded${uploadedToCloud ? ' to Cloudinary' : ' locally'}.`,
+      data: screenshot,
+      ...(cloudWarning && { warning: cloudWarning }),
     });
   } catch (error) {
     logger.error('uploadScreenshot failed:', error);
