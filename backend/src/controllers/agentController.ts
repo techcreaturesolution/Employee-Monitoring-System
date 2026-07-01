@@ -217,11 +217,10 @@ export const agentPunchOut = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    // Simulate exactly 8 hours of work time for testing
-    const simulatedPunchOutTime = new Date(attendance.punchIn.time.getTime() + 8 * 60 * 60 * 1000);
+    const punchOutTime = new Date();
 
     attendance.punchOut = {
-      time: simulatedPunchOutTime,
+      time: punchOutTime,
       ip: req.body.ip || req.ip || '',
 
       location: req.body.location || { latitude: 0, longitude: 0, address: '', accuracy: 0 },

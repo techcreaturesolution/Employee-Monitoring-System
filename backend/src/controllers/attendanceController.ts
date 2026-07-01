@@ -170,9 +170,8 @@ const getTodayAttendance = async (req: AuthRequest, res: Response, next: NextFun
 
 const getAttendanceHistory = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const userId = req.query.userId || req.user?._id;
     const tenantId = req.user?.tenantId;
-    const { page = 1, limit = 30, startDate, endDate } = req.query;
+    const { page = 1, limit = 30, startDate, endDate, userId } = req.query;
     const { skip, limit: lim } = paginate(Number(page), Number(limit));
 
     const filter: Record<string, unknown> = { tenantId };

@@ -1,6 +1,137 @@
 import { useState, useEffect } from 'react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+// ─── Shared Dynamic AppLogo Component ───────────────────────────────────────
+function AppLogo({ appName, windowTitle = '', className = 'w-6 h-6' }: { appName: string; windowTitle?: string; className?: string }) {
+  const app = appName.toLowerCase();
+  const title = windowTitle.toLowerCase();
+
+  // 1. Detect browser & resolve domain
+  let domain = '';
+  const browsers = ['chrome', 'brave', 'firefox', 'edge', 'safari', 'browser', 'internet explorer'];
+  const isBrowser = browsers.some(b => app.includes(b));
+
+  if (isBrowser) {
+    const commonWebsites = [
+      'github.com', 'github',
+      'stackoverflow.com', 'stackoverflow',
+      'notion.so', 'notion',
+      'figma.com', 'figma',
+      'gmail.com', 'gmail', 'mail.google',
+      'youtube.com', 'youtube',
+      'facebook.com', 'facebook',
+      'twitter.com', 'twitter', 'x.com',
+      'linkedin.com', 'linkedin',
+      'slack.com', 'slack',
+      'meet.google', 'google meet',
+      'zoom', 'zoom.us',
+      'trello.com', 'trello',
+      'jira', 'atlassian',
+      'reddit.com', 'reddit',
+      'netflix.com', 'netflix',
+    ];
+    for (const site of commonWebsites) {
+      if (title.includes(site) || app.includes(site)) {
+        if (site.includes('.')) {
+          domain = site;
+        } else {
+          if (site === 'github') domain = 'github.com';
+          else if (site === 'stackoverflow') domain = 'stackoverflow.com';
+          else if (site === 'notion') domain = 'notion.so';
+          else if (site === 'figma') domain = 'figma.com';
+          else if (site === 'gmail' || site === 'mail.google') domain = 'mail.google.com';
+          else if (site === 'youtube') domain = 'youtube.com';
+          else if (site === 'facebook') domain = 'facebook.com';
+          else if (site === 'twitter' || site === 'x.com') domain = 'twitter.com';
+          else if (site === 'linkedin') domain = 'linkedin.com';
+          else if (site === 'slack') domain = 'slack.com';
+          else if (site === 'google meet' || site === 'meet.google') domain = 'meet.google.com';
+          else if (site === 'zoom' || site === 'zoom.us') domain = 'zoom.us';
+          else if (site === 'trello') domain = 'trello.com';
+          else if (site === 'jira' || site === 'atlassian') domain = 'jira.com';
+          else if (site === 'reddit') domain = 'reddit.com';
+          else if (site === 'netflix') domain = 'netflix.com';
+        }
+        break;
+      }
+    }
+  }
+
+  // Favicon loading
+  if (domain) {
+    return (
+      <img
+        src={`https://www.google.com/s2/favicons?sz=64&domain=${domain}`}
+        alt={domain}
+        className={`${className} rounded object-contain bg-white/10 p-0.5 flex-shrink-0`}
+        onError={(e) => {
+          (e.target as HTMLElement).style.display = 'none';
+        }}
+      />
+    );
+  }
+
+  // Desktop App Logo Mapping
+  const appMappings: Record<string, string> = {
+    'visual studio code': 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vscode/vscode-original.svg',
+    'vscode': 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vscode/vscode-original.svg',
+    'slack': 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/slack/slack-original.svg',
+    'discord': 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/discordjs/discordjs-original.svg',
+    'figma': 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/figma/figma-original.svg',
+    'git': 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/git/git-original.svg',
+    'github': 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg',
+    'docker': 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg',
+    'postman': 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postman/postman-original.svg',
+    'teams': 'https://img.icons8.com/color/48/microsoft-teams.png',
+    'zoom': 'https://img.icons8.com/color/48/zoom.png',
+    'excel': 'https://img.icons8.com/color/48/microsoft-excel-2019.png',
+    'word': 'https://img.icons8.com/color/48/microsoft-word-2019.png',
+    'powerpoint': 'https://img.icons8.com/color/48/microsoft-powerpoint-2019.png',
+    'terminal': 'https://img.icons8.com/color/48/console.png',
+    'powershell': 'https://img.icons8.com/color/48/powershell.png',
+    'cmd': 'https://img.icons8.com/color/48/command-line.png',
+    'windows explorer': 'https://img.icons8.com/color/48/windows-explorer.png',
+    'file explorer': 'https://img.icons8.com/color/48/windows-explorer.png',
+    'explorer': 'https://img.icons8.com/color/48/windows-explorer.png',
+    'finder': 'https://img.icons8.com/color/48/finder.png',
+  };
+
+  for (const [key, iconUrl] of Object.entries(appMappings)) {
+    if (app.includes(key)) {
+      return (
+        <img
+          src={iconUrl}
+          alt={appName}
+          className={`${className} rounded object-contain flex-shrink-0`}
+        />
+      );
+    }
+  }
+
+  // Consistent hash circle placeholder
+  const initials = appName.substring(0, 2).toUpperCase();
+  let hash = 0;
+  for (let i = 0; i < appName.length; i++) {
+    hash = appName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const colors = [
+    'from-blue-600 to-cyan-500',
+    'from-purple-600 to-indigo-500',
+    'from-green-600 to-emerald-500',
+    'from-orange-600 to-amber-500',
+    'from-pink-600 to-rose-500',
+    'from-teal-600 to-cyan-500',
+  ];
+  const colorIndex = Math.abs(hash) % colors.length;
+  const gradient = colors[colorIndex];
+
+  return (
+    <div className={`${className} rounded bg-gradient-to-br ${gradient} flex items-center justify-center text-[10px] font-bold text-white shadow-sm flex-shrink-0 uppercase`}>
+      {initials}
+    </div>
+  );
+}
 const WORK_HOURS = 8;
 const VERSION = 'v1.2.0';
 
@@ -775,53 +906,13 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
 
               {/* Current Activity details */}
               <div className="bg-[#161b22] border border-[#21262d] rounded-xl p-3.5 flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#0d1117] border border-[#21262d] rounded-lg flex items-center justify-center flex-shrink-0">
-                  {activity ? (() => {
-                    const app = activity.app.toLowerCase();
-                    if (app.includes('code') || app.includes('visual studio')) {
-                      return (
-                        <svg className="w-5 h-5 text-[#007acc]" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M23.986 6.568l-3.342-1.611a.488.488 0 00-.517.067L12 11.23 7.873 5.024a.488.488 0 00-.517-.067L4.014 6.568a.488.488 0 00-.272.438v10.021c0 .193.113.367.272.438l3.342 1.611c.162.078.354.053.491-.061L12 12.77l4.127 6.182a.488.488 0 00.491.061l3.342-1.611a.488.488 0 00.272-.438V7.006a.488.488 0 00-.246-.438zM6.577 15.652l-2.023-.975V9.323l2.023-.975v7.304zM12 11.83l-3.633-5.45 3.633 5.45zm0 .94l3.633 5.45-3.633-5.45zm5.423 2.882l-2.023.975V8.348l2.023.975v7.304z"/>
-                        </svg>
-                      );
-                    }
-                    if (app.includes('chrome') || app.includes('browser') || app.includes('brave') || app.includes('edge') || app.includes('firefox') || app.includes('safari')) {
-                      return (
-                        <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10" />
-                          <circle cx="12" cy="12" r="4" />
-                          <line x1="21.17" y1="8" x2="12" y2="8" />
-                          <line x1="3.95" y1="6.06" x2="8.54" y2="14" />
-                          <line x1="10.88" y1="21.94" x2="15.46" y2="14" />
-                        </svg>
-                      );
-                    }
-                    if (app.includes('terminal') || app.includes('cmd') || app.includes('powershell') || app.includes('bash')) {
-                      return (
-                        <svg className="w-5 h-5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="4 17 10 11 4 5" />
-                          <line x1="12" y1="19" x2="20" y2="19" />
-                        </svg>
-                      );
-                    }
-                    if (app.includes('figma')) {
-                      return (
-                        <svg className="w-5 h-5 text-purple-400" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 2C8.69 2 6 4.69 6 8c0 2.21 1.2 4.15 3 5.18V16c0 3.31 2.69 6 6 6s6-2.69 6-6V8c0-3.31-2.69-6-6-6zm-3 6c0-1.66 1.34-3 3-3s3 1.34 3 3-1.34 3-3 3-3-1.34-3-3zm6 8c0 1.66-1.34 3-3 3s-3-1.34-3-3v-1.18c.87.69 1.95 1.18 3.18 1.18 2.21 0 3.82-1.79 3.82-4V16z"/>
-                        </svg>
-                      );
-                    }
-                    return (
-                      <svg className="w-5 h-5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                        <line x1="8" y1="21" x2="16" y2="21" />
-                        <line x1="12" y1="17" x2="12" y2="21" />
-                      </svg>
-                    );
-                  })() : (
+                {activity ? (
+                  <AppLogo appName={activity.app} windowTitle={activity.title} className="w-10 h-10 flex-shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 bg-[#0d1117] border border-[#21262d] rounded-lg flex items-center justify-center flex-shrink-0">
                     <svg className="w-5 h-5 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-                  )}
-                </div>
+                  </div>
+                )}
                 <div className="min-w-0">
                   <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Current App</p>
                   <p className="text-sm font-bold text-white mt-0.5 truncate">{activity ? activity.app : 'None'}</p>
@@ -867,28 +958,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
               </div>
             </div>
 
-            {/* Timeline log */}
-            <section className="bg-[#161b22] border border-[#21262d] rounded-xl overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[#21262d]">
-                <span className="text-blue-400">{Icon.calendar}</span>
-                <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-widest">Activity Timeline</span>
-              </div>
-              <div className="px-4 py-3 space-y-3.5">
-                {timelineEvents.slice(0, 5).map((e, idx) => (
-                  <div key={idx} className="flex gap-3 text-xs items-start">
-                    <span className="text-slate-500 font-mono w-14 flex-shrink-0 text-right">{e.time}</span>
-                    <div className="relative flex flex-col items-center mt-1">
-                      <span className={`w-2 h-2 rounded-full ${e.color}`} />
-                      {idx < Math.min(timelineEvents.length, 5) - 1 && <span className="w-0.5 h-7 bg-[#21262d] absolute top-2" />}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-slate-200">{e.event}</p>
-                      <p className="text-[10px] text-slate-500">{e.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
+
 
             {/* Diagnostics Logs */}
             <section className="bg-[#161b22] border border-[#21262d] rounded-xl overflow-hidden">
@@ -1097,10 +1167,12 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
 
             {/* Motivational Banner (4th SS) */}
             <div className="bg-gradient-to-r from-blue-600/25 to-purple-600/10 border border-blue-500/20 rounded-xl p-3 flex items-center gap-3">
-              <span className="text-xl">🏆</span>
+              <span className="text-xl">{prodPct >= 80 ? '🏆' : '💪'}</span>
               <div>
-                <p className="text-xs font-bold text-blue-200">You are doing great! 🎉</p>
-                <p className="text-[10px] text-slate-400">Your productivity is {prodPct}%, which is higher than yesterday (80%). Keep it up!</p>
+                <p className="text-xs font-bold text-blue-200">{prodPct >= 80 ? 'You are doing great! 🎉' : 'Keep improving! 👍'}</p>
+                <p className="text-[10px] text-slate-400">
+                  Your productivity is {prodPct}%, which is {prodPct >= 80 ? 'higher than or equal to' : 'below'} yesterday's target (80%). {prodPct >= 80 ? 'Keep it up!' : 'Focus on key tasks to boost your score!'}
+                </p>
               </div>
             </div>
           </div>

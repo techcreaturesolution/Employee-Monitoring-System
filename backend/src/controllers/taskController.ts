@@ -5,7 +5,7 @@ import { AuthRequest } from '../middleware/auth';
 export const listTasks = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const tenantId = req.user?.tenantId;
-    const { userId, done } = req.query;
+    const { userId, done, projectId } = req.query;
 
     const filter: Record<string, unknown> = { tenantId };
 
@@ -19,7 +19,11 @@ export const listTasks = async (req: AuthRequest, res: Response, next: NextFunct
       filter.done = done === 'true';
     }
 
-    let tasks = await Task.find(filter).sort({ createdAt: -1 });
+    if (projectId) {
+      filter.projectId = projectId;
+    }
+
+    let tasks = await Task.find(filter).populate('projectId', 'name').sort({ createdAt: -1 });
     
     // Auto-seed default tasks if none exist for this user, ensuring a populated UI
     if (tasks.length === 0 && filter.userId) {
@@ -43,7 +47,7 @@ export const listTasks = async (req: AuthRequest, res: Response, next: NextFunct
 export const createTask = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const tenantId = req.user?.tenantId;
-    const { title, deadline, userId } = req.body;
+    const { title, deadline, userId, projectId } = req.body;
 
     const targetUserId = req.user?.role === 'employee' ? req.user._id : (userId || req.user?._id);
 
@@ -52,6 +56,7 @@ export const createTask = async (req: AuthRequest, res: Response, next: NextFunc
       deadline,
       userId: targetUserId,
       tenantId,
+      projectId: projectId || undefined,
       done: false,
     });
 
@@ -64,7 +69,7 @@ export const createTask = async (req: AuthRequest, res: Response, next: NextFunc
 export const updateTask = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
-    const { title, deadline, done } = req.body;
+    const { title, deadline, done, projectId } = req.body;
 
     const task = await Task.findById(id);
     if (!task) {
@@ -81,6 +86,7 @@ export const updateTask = async (req: AuthRequest, res: Response, next: NextFunc
     if (title !== undefined) task.title = title;
     if (deadline !== undefined) task.deadline = deadline;
     if (done !== undefined) task.done = done;
+    if (projectId !== undefined) task.projectId = projectId || undefined;
 
     await task.save();
 

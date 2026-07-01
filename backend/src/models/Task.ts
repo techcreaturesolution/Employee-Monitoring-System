@@ -4,6 +4,7 @@ export interface ITask extends Document {
   title: string;
   userId: mongoose.Types.ObjectId;
   tenantId: mongoose.Types.ObjectId;
+  projectId?: mongoose.Types.ObjectId;
   deadline: string;
   done: boolean;
   createdAt: Date;
@@ -15,6 +16,7 @@ const taskSchema = new Schema<ITask>(
     title: { type: String, required: true, trim: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+    projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: false },
     deadline: { type: String, required: true },
     done: { type: Boolean, default: false },
   },
