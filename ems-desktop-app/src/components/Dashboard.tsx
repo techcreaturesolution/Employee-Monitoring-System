@@ -199,14 +199,6 @@ const DEMO_TASKS = [
   { id: 5, title: 'Integrate notification center', deadline: '20 May 2025', done: true },
 ];
 
-const TIMELINE_EVENTS = [
-  { time: '09:00 AM', event: 'Punch In', desc: 'Work session started', color: 'bg-green-500' },
-  { time: '09:05 AM', event: 'VS Code', desc: 'attendance.controller.ts', color: 'bg-blue-500' },
-  { time: '10:15 AM', event: 'Google Chrome', desc: 'docs.google.com', color: 'bg-purple-500' },
-  { time: '11:30 AM', event: 'Idle', desc: '5m 20s', color: 'bg-amber-500' },
-  { time: '11:35 AM', event: 'VS Code', desc: 'user.service.ts', color: 'bg-blue-500' },
-  { time: '01:00 PM', event: 'Lunch Break', desc: '45m', color: 'bg-slate-500' },
-];
 
 const SCREENSHOT_TILES = [
   { id: 1, time: '11:30:15 AM', desc: 'VS Code', url: 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=300&auto=format&fit=crop&q=60' },
@@ -273,9 +265,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [activity, setActivity]       = useState<{ app: string; title: string } | null>(null);
   const [taskFilter, setTaskFilter]   = useState<'All' | 'Remaining' | 'Done'>('Remaining');
   
-  // Dynamic data states
   const [tasks, setTasks]             = useState<any[]>(DEMO_TASKS);
-  const [timelineEvents, setTimelineEvents] = useState<any[]>(TIMELINE_EVENTS);
   const [screenshotTiles, setScreenshotTiles] = useState<any[]>(SCREENSHOT_TILES);
   const [_projects, setProjects]       = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('Select Project');
@@ -366,31 +356,6 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
-  const fetchTimelineEvents = async () => {
-    try {
-      const res = await customFetch(`${API_URL}/activity?limit=6`, { headers: headers() });
-      const data = await res.json();
-      if (data.success && data.data?.logs) {
-        const events = data.data.logs.map((log: any) => {
-          let color = 'bg-gray-400';
-          if (log.category === 'productive') color = 'bg-green-500';
-          if (log.category === 'unproductive') color = 'bg-red-500';
-          
-          return {
-            time: new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            event: log.appName,
-            desc: log.windowTitle || `${log.durationMinutes}m`,
-            color
-          };
-        });
-        setTimelineEvents(events.length > 0 ? events : TIMELINE_EVENTS);
-      } else {
-        setTimelineEvents(TIMELINE_EVENTS);
-      }
-    } catch {
-      setTimelineEvents(TIMELINE_EVENTS);
-    }
-  };
 
   const fetchProjects = async () => {
     try {
@@ -451,7 +416,6 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
     // Fetch initial dynamic content
     fetchTasks();
     fetchScreenshots();
-    fetchTimelineEvents();
     fetchProjects();
     fetchTopApps();
 
@@ -575,7 +539,6 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     const refreshData = () => {
       fetchTasks();
-      fetchTimelineEvents();
       fetchProjects();
       fetchTopApps();
     };
@@ -1153,7 +1116,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                   <span className="text-[10px]">Projects</span>
                 </button>
 
-                <button onClick={() => { fetchTasks(); fetchTimelineEvents(); }} className="flex flex-col items-center gap-1.5 p-2 bg-[#0d1117] border border-[#21262d] hover:border-blue-500/50 rounded-lg text-slate-300 transition-colors">
+                <button onClick={() => { fetchTasks(); }} className="flex flex-col items-center gap-1.5 p-2 bg-[#0d1117] border border-[#21262d] hover:border-blue-500/50 rounded-lg text-slate-300 transition-colors">
                   <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" /></svg>
                   <span className="text-[10px]">Sync Now</span>
                 </button>

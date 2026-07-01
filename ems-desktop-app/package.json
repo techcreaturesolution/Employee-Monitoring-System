@@ -41,5 +41,24 @@
     "typescript": "~6.0.2",
     "vite": "^8.1.0",
     "wait-on": "^9.0.10"
+  },
+  "build": {
+    "appId": "com.ems.agent",
+    "productName": "EMSAgent",
+    "directories": {
+      "output": "dist-packaged"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
