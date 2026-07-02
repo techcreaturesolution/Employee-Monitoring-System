@@ -82,6 +82,8 @@ class AgentService {
   start() {
     console.log('Agent starting background tasks...');
     this.stop(); // Clear any existing intervals first to avoid duplicate timers
+    this.activityStartTime = new Date();
+    this.lastActivityLog = null;
     
     // Wait for backend to be ready before firing heartbeats/sync
     // (avoids ECONNREFUSED flood during initial app startup)
@@ -242,11 +244,12 @@ class AgentService {
       const finalActivity = {
         ...this.lastActivityLog,
         durationMinutes: Math.round(durationMinutes * 100) / 100,
-        endTime: new Date().toISOString()
+        endTime: now.toISOString()
       };
       
       this.activityBuffer.push(finalActivity);
       this.lastActivityLog = null;
+      this.activityStartTime = now;
     }
   }
 

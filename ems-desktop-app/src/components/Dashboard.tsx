@@ -1093,7 +1093,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                       <span className="text-[8px] text-green-500">▲ 12% vs yesterday</span>
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-500">Idle Time</p>
+                      <p className="text-[10px] text-slate-500">Neutral Time</p>
                       <p className="text-md font-bold text-amber-400">{formatHM(neutSec)}</p>
                       <span className="text-[8px] text-amber-500">▼ 8% vs yesterday</span>
                     </div>

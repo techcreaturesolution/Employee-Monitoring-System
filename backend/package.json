@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "lint": "eslint src/ --ext .ts",
     "seed": "ts-node src/scripts/seed.ts",
-    "seed:keywords": "ts-node src/scripts/seedProductivityKeywords.ts"
+    "seed:keywords": "ts-node src/scripts/seedProductivityKeywords.ts",
+    "cleanup:activities": "ts-node src/scripts/cleanupInflatedActivities.ts"
   },
   "dependencies": {
     "@sentry/node": "^10.62.0",
