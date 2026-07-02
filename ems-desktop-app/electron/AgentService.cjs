@@ -65,23 +65,10 @@ class AgentService {
   async waitForBackend(maxAttempts = 5, delayMs = 2000) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const http = require('http');
-        await new Promise((resolve, reject) => {
-          const url = new URL(this.apiBaseUrl);
-          const req = http.get({
-            hostname: url.hostname,
-            port: url.port || 5000,
-            path: '/api/health',
-            timeout: 3000,
-          }, (res) => {
-            resolve(res.statusCode);
-          });
-          req.on('error', reject);
-          req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
-        });
+        await axios.get(`${this.apiBaseUrl}/health`, { timeout: 3000 });
         console.log(`[Agent] Backend reachable on attempt ${attempt}`);
         return true;
-      } catch {
+      } catch (err) {
         if (attempt < maxAttempts) {
           console.log(`[Agent] Backend not ready (attempt ${attempt}/${maxAttempts}), retrying in ${delayMs}ms...`);
           await new Promise(r => setTimeout(r, delayMs));

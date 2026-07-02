@@ -36,6 +36,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
+      backgroundThrottling: false
     },
     autoHideMenuBar: true,
   });
@@ -69,7 +70,8 @@ function createTray() {
     tray = new Tray(nativeImage.createFromDataURL(iconBase64));
     const contextMenu = Menu.buildFromTemplate([
       { label: 'Show App', click: () => mainWindow.show() },
-      { label: 'About EMS', click: () => {
+      {
+        label: 'About EMS', click: () => {
           dialog.showMessageBox(mainWindow, {
             type: 'info',
             title: 'About EMS',
@@ -79,7 +81,8 @@ function createTray() {
         }
       },
       { type: 'separator' },
-      { label: 'Exit App', click: () => {
+      {
+        label: 'Exit App', click: () => {
           isQuitting = true;
           app.quit();
         }
@@ -126,7 +129,18 @@ function setupIpcListeners() {
         idleMs += cpu.times.idle;
       });
       const cpuUsage = Math.min(Math.max(Math.round((1 - idleMs / totalMs) * 100), 5), 95);
-      const diskUsage = 41 + Math.floor(Math.random() * 3); // realistic approximation
+
+      let diskUsage = 41;
+      try {
+        const fs = require('fs');
+        const stats = fs.statfsSync(process.cwd() || 'C:');
+        if (stats && stats.blocks > 0) {
+          diskUsage = Math.round(((stats.blocks - stats.bavail) / stats.blocks) * 100);
+        }
+      } catch (diskErr) {
+        console.error('Failed to query system disk usage:', diskErr);
+        diskUsage = 41 + Math.floor(Math.random() * 3);
+      }
 
       return { cpuUsage, memUsage, diskUsage };
     } catch {

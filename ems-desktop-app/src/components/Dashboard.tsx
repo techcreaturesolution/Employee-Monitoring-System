@@ -151,36 +151,42 @@ const formatHM = (sec: number) => {
 const eAPI = () => (window as any).electronAPI;
 
 // ─── Optimized Timer-related Components ─────────────────────────────────────
-function TimerDisplay({ startSec, active }: { startSec: number; active: boolean }) {
-  const [sec, setSec] = useState(startSec);
-  useEffect(() => { setSec(startSec); }, [startSec]);
+function TimerDisplay({ punchInTime, active }: { punchInTime: Date | null; active: boolean }) {
+  const [sec, setSec] = useState(() => punchInTime ? Math.floor((Date.now() - punchInTime.getTime()) / 1000) : 0);
   useEffect(() => {
-    if (!active) return;
-    const interval = setInterval(() => { setSec(s => s + 1); }, 1000);
+    if (!active || !punchInTime) return;
+    setSec(Math.floor((Date.now() - punchInTime.getTime()) / 1000));
+    const interval = setInterval(() => {
+      setSec(Math.floor((Date.now() - punchInTime.getTime()) / 1000));
+    }, 1000);
     return () => clearInterval(interval);
-  }, [active]);
+  }, [active, punchInTime]);
   return <>{formatTimer(sec)}</>;
 }
 
-function HMDisplay({ startSec, active, updateInterval = 5000 }: { startSec: number; active: boolean; updateInterval?: number }) {
-  const [sec, setSec] = useState(startSec);
-  useEffect(() => { setSec(startSec); }, [startSec]);
+function HMDisplay({ punchInTime, active, updateInterval = 5000 }: { punchInTime: Date | null; active: boolean; updateInterval?: number }) {
+  const [sec, setSec] = useState(() => punchInTime ? Math.floor((Date.now() - punchInTime.getTime()) / 1000) : 0);
   useEffect(() => {
-    if (!active) return;
-    const interval = setInterval(() => { setSec(s => s + updateInterval / 1000); }, updateInterval);
+    if (!active || !punchInTime) return;
+    setSec(Math.floor((Date.now() - punchInTime.getTime()) / 1000));
+    const interval = setInterval(() => {
+      setSec(Math.floor((Date.now() - punchInTime.getTime()) / 1000));
+    }, updateInterval);
     return () => clearInterval(interval);
-  }, [active, updateInterval]);
+  }, [active, punchInTime, updateInterval]);
   return <>{formatHM(sec)}</>;
 }
 
-function ProgressBar({ startSec, active }: { startSec: number; active: boolean }) {
-  const [sec, setSec] = useState(startSec);
-  useEffect(() => { setSec(startSec); }, [startSec]);
+function ProgressBar({ punchInTime, active }: { punchInTime: Date | null; active: boolean }) {
+  const [sec, setSec] = useState(() => punchInTime ? Math.floor((Date.now() - punchInTime.getTime()) / 1000) : 0);
   useEffect(() => {
-    if (!active) return;
-    const interval = setInterval(() => { setSec(s => s + 1); }, 1000);
+    if (!active || !punchInTime) return;
+    setSec(Math.floor((Date.now() - punchInTime.getTime()) / 1000));
+    const interval = setInterval(() => {
+      setSec(Math.floor((Date.now() - punchInTime.getTime()) / 1000));
+    }, 1000);
     return () => clearInterval(interval);
-  }, [active]);
+  }, [active, punchInTime]);
   const pct = Math.min((sec / (WORK_HOURS * 3600)) * 100, 100);
   const overtime = sec > WORK_HOURS * 3600;
   return (
@@ -192,10 +198,10 @@ function ProgressBar({ startSec, active }: { startSec: number; active: boolean }
 
 // ─── Sample Data ────────────────────────────────────────────────────────────
 const DEMO_TASKS = [
-  { id: 1, title: 'Design dashboard UI',        deadline: '22 May 2025', done: false },
-  { id: 2, title: 'Implement idle detection',   deadline: '25 May 2025', done: false },
-  { id: 3, title: 'Fix screenshot upload issue',deadline: '28 May 2025', done: false },
-  { id: 4, title: 'Setup heartbeat service',    deadline: '18 May 2025', done: true  },
+  { id: 1, title: 'Design dashboard UI', deadline: '22 May 2025', done: false },
+  { id: 2, title: 'Implement idle detection', deadline: '25 May 2025', done: false },
+  { id: 3, title: 'Fix screenshot upload issue', deadline: '28 May 2025', done: false },
+  { id: 4, title: 'Setup heartbeat service', deadline: '18 May 2025', done: true },
   { id: 5, title: 'Integrate notification center', deadline: '20 May 2025', done: true },
 ];
 
@@ -216,16 +222,16 @@ const SYSTEM_LOGS = [
 
 // ─── Icons (inline SVG) ──────────────────────────────────────────────────────
 const Icon = {
-  shield:   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
-  calendar: <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
-  monitor:  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
-  check:    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="20 6 9 17 4 12" /></svg>,
+  shield: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+  calendar: <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>,
+  monitor: <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>,
+  check: <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><polyline points="20 6 9 17 4 12" /></svg>,
   punchout: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
-  punchin:  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" /></svg>,
-  tasks:    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
-  chevron:  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polyline points="6 9 12 15 18 9" /></svg>,
-  right:    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polyline points="9 18 15 12 9 6" /></svg>,
-  layout:   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>,
+  punchin: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" /></svg>,
+  tasks: <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>,
+  chevron: <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polyline points="6 9 12 15 18 9" /></svg>,
+  right: <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polyline points="9 18 15 12 9 6" /></svg>,
+  layout: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" /><rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" /></svg>,
 };
 
 // ─── Window Controls Bar ─────────────────────────────────────────────────────
@@ -252,30 +258,31 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   const [punchStatus, setPunchStatus] = useState<'in' | 'out'>('out');
   const [punchInTime, setPunchInTime] = useState<Date | null>(null);
-  const [elapsedSec, setElapsedSec]   = useState(0);
-  const [totalSec, setTotalSec]       = useState(0);
+  const [totalSec, setTotalSec] = useState(0);
+
+  const elapsedSec = punchInTime ? Math.floor((Date.now() - punchInTime.getTime()) / 1000) : 0;
 
   // Base productivity values
-  const [prodSec, setProdSec]         = useState(0);
-  const [neutSec, setNeutSec]         = useState(0);
-  const [unprodSec, setUnprodSec]     = useState(0);
+  const [prodSec, setProdSec] = useState(0);
+  const [neutSec, setNeutSec] = useState(0);
+  const [unprodSec, setUnprodSec] = useState(0);
 
-  const [_loading, setLoading]         = useState(false);
-  const [error, setError]             = useState('');
-  const [activity, setActivity]       = useState<{ app: string; title: string } | null>(null);
-  const [taskFilter, setTaskFilter]   = useState<'All' | 'Remaining' | 'Done'>('Remaining');
-  
-  const [tasks, setTasks]             = useState<any[]>(DEMO_TASKS);
+  const [_loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [activity, setActivity] = useState<{ app: string; title: string } | null>(null);
+  const [taskFilter, setTaskFilter] = useState<'All' | 'Remaining' | 'Done'>('Remaining');
+
+  const [tasks, setTasks] = useState<any[]>(DEMO_TASKS);
   const [screenshotTiles, setScreenshotTiles] = useState<any[]>(SCREENSHOT_TILES);
-  const [_projects, setProjects]       = useState<any[]>([]);
+  const [_projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>('Select Project');
   const [diagnostics, setDiagnostics] = useState({ cpuUsage: 18, memUsage: 52, diskUsage: 41 });
   const [unsyncedCount, setUnsyncedCount] = useState(0);
   const [serverConnected, setServerConnected] = useState(true);
-  const [autoStart, setAutoStart]     = useState(false);
+  const [autoStart, setAutoStart] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [topApps, setTopApps]         = useState<any[]>([]);
-  
+  const [topApps, setTopApps] = useState<any[]>([]);
+
 
 
   // App classification helper
@@ -378,8 +385,24 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
       todayStart.setHours(0, 0, 0, 0);
       const res = await customFetch(`${API_URL}/activity/summary?startDate=${todayStart.toISOString()}`, { headers: headers() });
       const data = await res.json();
-      if (data.success && data.data?.topApps) {
-        setTopApps(data.data.topApps);
+      if (data.success && data.data) {
+        if (data.data.topApps) {
+          setTopApps(data.data.topApps);
+        }
+        if (data.data.summary) {
+          let pSec = 0;
+          let nSec = 0;
+          let uSec = 0;
+          data.data.summary.forEach((item: any) => {
+            const sec = Math.floor((item.totalMinutes || 0) * 60);
+            if (item._id === 'productive') pSec = sec;
+            else if (item._id === 'neutral') nSec = sec;
+            else if (item._id === 'unproductive') uSec = sec;
+          });
+          setProdSec(pSec);
+          setNeutSec(nSec);
+          setUnprodSec(uSec);
+        }
       }
     } catch {
       // ignore
@@ -390,7 +413,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     (async () => {
       try {
-        const res  = await customFetch(`${API_URL}/agent/status`, { headers: headers() });
+        const res = await customFetch(`${API_URL}/agent/status`, { headers: headers() });
         const data = await res.json();
         if (data.success) {
           setTotalSec((data.data.totalWorkMinutes || 0) * 60);
@@ -398,13 +421,6 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
             const pit = new Date(data.data.punchInTime);
             setPunchStatus('in');
             setPunchInTime(pit);
-            const serverElapsed = Math.floor((Date.now() - pit.getTime()) / 1000);
-            setElapsedSec(serverElapsed);
-            const pSec = Math.floor(serverElapsed * 0.75);
-            const nSec = Math.floor(serverElapsed * 0.15);
-            setProdSec(pSec);
-            setNeutSec(nSec);
-            setUnprodSec(serverElapsed - pSec - nSec);
             if (eAPI()) eAPI().setTracking(true);
           } else {
             if (eAPI()) eAPI().setTracking(false);
@@ -422,7 +438,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
     const api = eAPI();
     if (api) {
       if (api.getAutoStart) {
-        api.getAutoStart().then(setAutoStart).catch(() => {});
+        api.getAutoStart().then(setAutoStart).catch(() => { });
       }
       if (api.onIdleStatusChanged) {
         api.onIdleStatusChanged((data: any) => {
@@ -450,7 +466,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
     const poll = async () => {
       const api = eAPI();
       if (!api) return;
-      
+
       let appName = 'Unknown';
       let titleStr = '';
       try {
@@ -465,12 +481,11 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
       } catch (err) {
         console.error('Failed to get active activity in dashboard poll:', err);
       }
-      
+
       const cat = classifyApp(appName, titleStr);
       if (cat === 'productive') setProdSec(p => p + 5);
       else if (cat === 'neutral') setNeutSec(n => n + 5);
       else setUnprodSec(u => u + 5);
-      setElapsedSec(e => e + 5);
     };
     poll();
     const id = setInterval(poll, 5000);
@@ -521,7 +536,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
         try {
           const cnt = await api.getQueueCount();
           setUnsyncedCount(cnt);
-        } catch {}
+        } catch { }
       }
       try {
         const res = await fetch(`${API_URL.replace('/api', '')}/api/health`);
@@ -549,7 +564,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   const handlePunch = async (type: 'in' | 'out') => {
     setError(''); setLoading(true);
     try {
-      const res  = await customFetch(`${API_URL}/agent/punch-${type}`, {
+      const res = await customFetch(`${API_URL}/agent/punch-${type}`, {
         method: 'POST', headers: headers(),
         body: JSON.stringify({ ip: '127.0.0.1' }),
       });
@@ -557,7 +572,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
       if (data.success) {
         if (type === 'in') {
           const now = new Date();
-          setPunchStatus('in'); setPunchInTime(now); setElapsedSec(0);
+          setPunchStatus('in'); setPunchInTime(now);
           setProdSec(0); setNeutSec(0); setUnprodSec(0);
           if (eAPI()) eAPI().setTracking(true);
           new Notification("EMS Monitor", { body: "Punch In successful. Tracking started." });
@@ -621,7 +636,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
     taskFilter === 'All' ? true : taskFilter === 'Done' ? t.done : !t.done);
 
   const overtime = elapsedSec > WORK_HOURS * 3600;
-  const inAtStr  = punchInTime
+  const inAtStr = punchInTime
     ? punchInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : null;
 
@@ -705,16 +720,16 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                     <>
                       <div className="text-center mb-3">
                         <div className={`text-4xl font-mono font-bold tracking-tight leading-none ${overtime ? 'text-amber-400' : 'text-white'}`}>
-                          <TimerDisplay startSec={elapsedSec} active={punchStatus === 'in'} />
+                          <TimerDisplay punchInTime={punchInTime} active={punchStatus === 'in'} />
                         </div>
                         <p className="text-[11px] text-slate-500 mt-1.5">
                           Goal: {WORK_HOURS} hrs{inAtStr && <span> • In at {inAtStr}</span>}
                         </p>
                       </div>
-                      <ProgressBar startSec={elapsedSec} active={punchStatus === 'in'} />
+                      <ProgressBar punchInTime={punchInTime} active={punchStatus === 'in'} />
                       <div className="flex justify-between text-[10px] text-slate-600 mb-3.5">
                         <span>0 hr</span>
-                        <span><HMDisplay startSec={elapsedSec} active={punchStatus === 'in'} /> / {WORK_HOURS} hr</span>
+                        <span><HMDisplay punchInTime={punchInTime} active={punchStatus === 'in'} /> / {WORK_HOURS} hr</span>
                         <span>{WORK_HOURS} hr</span>
                       </div>
                       <button onClick={() => handlePunch('out')} className="w-full py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
@@ -843,7 +858,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                 <div>
                   <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Attendance Timer</p>
                   <h2 className="text-xl font-mono font-bold text-white mt-1">
-                    {punchStatus === 'in' ? <TimerDisplay startSec={elapsedSec} active={punchStatus === 'in'} /> : '00:00:00'}
+                    {punchStatus === 'in' ? <TimerDisplay punchInTime={punchInTime} active={punchStatus === 'in'} /> : '00:00:00'}
                   </h2>
                   <p className="text-[10px] text-slate-400 mt-0.5">Goal: 8h 00m</p>
                 </div>
@@ -898,7 +913,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                         <span className="text-[8px] text-slate-400 font-semibold leading-none">Productive</span>
                       </div>
                     </div>
-                    
+
                     <div className="flex-1 space-y-1.5 text-[11px] text-slate-300">
                       <div className="flex items-center justify-between">
                         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" />Productive</span>
@@ -916,7 +931,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 </div>
                 <div className="mt-3.5 border-t border-[#21262d] pt-2 text-center">
-                  <span className="text-[10px] text-slate-500 font-medium">Total Time: <HMDisplay startSec={elapsedSec} active={punchStatus === 'in'} /></span>
+                  <span className="text-[10px] text-slate-500 font-medium">Total Time: <HMDisplay punchInTime={punchInTime} active={punchStatus === 'in'} /></span>
                 </div>
               </div>
             </div>
@@ -1110,7 +1125,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                   <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" /></svg>
                   <span className="text-[10px]">Start Break</span>
                 </button>
-                
+
                 <button className="flex flex-col items-center gap-1.5 p-2 bg-[#0d1117] border border-[#21262d] hover:border-blue-500/50 rounded-lg text-slate-300 transition-colors">
                   <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
                   <span className="text-[10px]">Projects</span>
