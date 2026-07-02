@@ -232,6 +232,7 @@ const Icon = {
   chevron: <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polyline points="6 9 12 15 18 9" /></svg>,
   right: <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polyline points="9 18 15 12 9 6" /></svg>,
   layout: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="9" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" /><rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="16" width="7" height="5" rx="1" /></svg>,
+  refresh: <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6" /><path d="M1 20v-6h6" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>,
 };
 
 // ─── Window Controls Bar ─────────────────────────────────────────────────────
@@ -409,31 +410,50 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
+  const refreshAll = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await customFetch(`${API_URL}/agent/status`, { headers: headers() });
+      const data = await res.json();
+      if (data.success) {
+        setTotalSec((data.data.totalWorkMinutes || 0) * 60);
+        if (data.data.isPunchedIn) {
+          const pit = new Date(data.data.punchInTime);
+          setPunchStatus('in');
+          setPunchInTime(pit);
+          if (eAPI()) eAPI().setTracking(true);
+        } else {
+          setPunchStatus('out');
+          setPunchInTime(null);
+          if (eAPI()) eAPI().setTracking(false);
+        }
+      }
+    } catch {
+      setError('Failed to sync backend status.');
+    }
+
+    await Promise.allSettled([
+      fetchTasks(),
+      fetchScreenshots(),
+      fetchProjects(),
+      fetchTopApps()
+    ]);
+
+    const api = eAPI();
+    if (api && api.getDiagnostics) {
+      try {
+        const stats = await api.getDiagnostics();
+        if (stats) setDiagnostics(stats);
+      } catch {}
+    }
+
+    setLoading(false);
+  };
+
   // Fetch status on mount
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await customFetch(`${API_URL}/agent/status`, { headers: headers() });
-        const data = await res.json();
-        if (data.success) {
-          setTotalSec((data.data.totalWorkMinutes || 0) * 60);
-          if (data.data.isPunchedIn) {
-            const pit = new Date(data.data.punchInTime);
-            setPunchStatus('in');
-            setPunchInTime(pit);
-            if (eAPI()) eAPI().setTracking(true);
-          } else {
-            if (eAPI()) eAPI().setTracking(false);
-          }
-        }
-      } catch { /* ignore */ }
-    })();
-
-    // Fetch initial dynamic content
-    fetchTasks();
-    fetchScreenshots();
-    fetchProjects();
-    fetchTopApps();
+    refreshAll();
 
     const api = eAPI();
     if (api) {
@@ -682,6 +702,17 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
             style={{ WebkitAppRegion: 'no-drag' } as any}
           >
             {Icon.layout}
+          </button>
+
+          {/* ── Refresh Button ─────────────────────────────────── */}
+          <button
+            onClick={refreshAll}
+            title="Refresh Data"
+            disabled={_loading}
+            className={`p-1 rounded bg-[#161b22] border border-[#30363d] hover:bg-[#21262d] text-blue-400 transition-colors flex items-center justify-center ${_loading ? 'animate-spin opacity-50' : ''}`}
+            style={{ WebkitAppRegion: 'no-drag' } as any}
+          >
+            {Icon.refresh}
           </button>
 
           <button
