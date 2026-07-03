@@ -1,0 +1,15 @@
+# Build and dependency outputs
+dist/
+node_modules/
+
+# Untracked/generated directories
+uploads/
+logs/
+
+# VS Code settings
+.vscode/
+
+# Environment files
+*.env
+.env
+.enc*

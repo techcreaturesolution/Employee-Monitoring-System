@@ -22,80 +22,104 @@
 //     --cap=<minutes>         What to cap inflated entries down to.
 //                              Default: 480 (8 hours — a full shift).
 
-import mongoose from 'mongoose';
-import { ActivityLog } from '../models/ActivityLog';
-import { config } from '../config';
+import mongoose from "mongoose";
+import { ActivityLog } from "../modules/activity/ActivityLog.model";
+import { config } from "../config";
 
 const args = process.argv.slice(2);
-const APPLY = args.includes('--apply');
+const APPLY = args.includes("--apply");
 const THRESHOLD_MINUTES = Number(
-  args.find((a) => a.startsWith('--threshold='))?.split('=')[1] || 600
+  args.find((a) => a.startsWith("--threshold="))?.split("=")[1] || 600
 );
 const CAP_MINUTES = Number(
-  args.find((a) => a.startsWith('--cap='))?.split('=')[1] || 480
+  args.find((a) => a.startsWith("--cap="))?.split("=")[1] || 480
 );
 
 async function run() {
   console.log(`\nConnecting to database...`);
   await mongoose.connect(config.mongodbUri);
-  console.log('Connected.\n');
+  console.log("Connected.\n");
 
-  console.log(`Mode: ${APPLY ? 'APPLY (will modify data)' : 'DRY RUN (read-only, changes nothing)'}`);
-  console.log(`Looking for ActivityLog entries with durationMinutes > ${THRESHOLD_MINUTES}...\n`);
+  console.log(
+    `Mode: ${APPLY ? "APPLY (will modify data)" : "DRY RUN (read-only, changes nothing)"}`
+  );
+  console.log(
+    `Looking for ActivityLog entries with durationMinutes > ${THRESHOLD_MINUTES}...\n`
+  );
 
   const inflated = await ActivityLog.find({
     durationMinutes: { $gt: THRESHOLD_MINUTES },
   })
-    .populate('userId', 'name email')
+    .populate("userId", "name email")
     .sort({ durationMinutes: -1 });
 
   if (inflated.length === 0) {
-    console.log('No inflated entries found. Nothing to do.\n');
+    console.log("No inflated entries found. Nothing to do.\n");
     await mongoose.disconnect();
     return;
   }
 
-  console.log(`Found ${inflated.length} inflated entr${inflated.length === 1 ? 'y' : 'ies'}:\n`);
+  console.log(
+    `Found ${inflated.length} inflated entr${inflated.length === 1 ? "y" : "ies"}:\n`
+  );
 
   let totalExcessMinutes = 0;
-  const byUser: Record<string, { name: string; count: number; excessMinutes: number }> = {};
+  const byUser: Record<
+    string,
+    { name: string; count: number; excessMinutes: number }
+  > = {};
 
   for (const entry of inflated) {
-    const user = entry.userId as unknown as { email?: string; name?: string } | null;
+    const user = entry.userId as unknown as {
+      email?: string;
+      name?: string;
+    } | null;
     const userLabel = user?.email || String(entry.userId);
     const excess = entry.durationMinutes - CAP_MINUTES;
     totalExcessMinutes += Math.max(excess, 0);
 
     if (!byUser[userLabel]) {
-      byUser[userLabel] = { name: user?.name || 'Unknown', count: 0, excessMinutes: 0 };
+      byUser[userLabel] = {
+        name: user?.name || "Unknown",
+        count: 0,
+        excessMinutes: 0,
+      };
     }
     byUser[userLabel].count += 1;
     byUser[userLabel].excessMinutes += Math.max(excess, 0);
 
     console.log(
       `  - ${userLabel} | ${entry.appName} | ` +
-      `${(entry.durationMinutes / 60).toFixed(1)}h logged | ` +
-      `started ${entry.startTime.toISOString()}`
+        `${(entry.durationMinutes / 60).toFixed(1)}h logged | ` +
+        `started ${entry.startTime.toISOString()}`
     );
   }
 
   console.log(`\n── Summary by user ──`);
   for (const [email, info] of Object.entries(byUser)) {
     console.log(
-      `  ${info.name} (${email}): ${info.count} bad entr${info.count === 1 ? 'y' : 'ies'}, ` +
-      `${(info.excessMinutes / 60).toFixed(1)}h of inflated time`
+      `  ${info.name} (${email}): ${info.count} bad entr${info.count === 1 ? "y" : "ies"}, ` +
+        `${(info.excessMinutes / 60).toFixed(1)}h of inflated time`
     );
   }
-  console.log(`\nTotal inflated time across all entries: ${(totalExcessMinutes / 60).toFixed(1)} hours\n`);
+  console.log(
+    `\nTotal inflated time across all entries: ${(totalExcessMinutes / 60).toFixed(1)} hours\n`
+  );
 
   if (!APPLY) {
-    console.log('This was a dry run — nothing was changed.');
-    console.log('Re-run with --apply to cap these entries down to ' + CAP_MINUTES + ' minutes each.\n');
+    console.log("This was a dry run — nothing was changed.");
+    console.log(
+      "Re-run with --apply to cap these entries down to " +
+        CAP_MINUTES +
+        " minutes each.\n"
+    );
     await mongoose.disconnect();
     return;
   }
 
-  console.log(`Applying fix: capping ${inflated.length} entries to ${CAP_MINUTES} minutes each...`);
+  console.log(
+    `Applying fix: capping ${inflated.length} entries to ${CAP_MINUTES} minutes each...`
+  );
   const result = await ActivityLog.updateMany(
     { durationMinutes: { $gt: THRESHOLD_MINUTES } },
     { $set: { durationMinutes: CAP_MINUTES } }
@@ -106,6 +130,6 @@ async function run() {
 }
 
 run().catch((err) => {
-  console.error('Script failed:', err);
+  console.error("Script failed:", err);
   process.exit(1);
 });
