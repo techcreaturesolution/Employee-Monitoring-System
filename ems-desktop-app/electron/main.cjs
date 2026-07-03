@@ -1,34 +1,47 @@
 const { app, BrowserWindow, Menu, Tray, ipcMain } = require('electron');
 const path = require('path');
 
-// Disable the noisy Electron Security Warning in development (Vite requires unsafe-eval for HMR)
-process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
-
-const isDev = !app.isPackaged;
-
 let mainWindow;
 let tray = null;
-
-app.on('ready', async () => {
-  try {
-    const storage = require('./storage.cjs');
-    await storage.cleanupOldRecords();
-  } catch (e) {
-    console.error('Failed to cleanup old records:', e);
-  }
-  createWindow();
-});
-
 let isQuitting = false;
+
+// Enforce single-instance lock
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (_event, _commandLine, _workingDirectory) => {
+    // Focus the existing window if a user tries to launch a second instance
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
+  // Disable the noisy Electron Security Warning in development (Vite requires unsafe-eval for HMR)
+  process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
+
+  const isDev = !app.isPackaged;
+
+  app.on('ready', async () => {
+    try {
+      const storage = require('./storage.cjs');
+      await storage.cleanupOldRecords();
+    } catch (e) {
+      console.error('Failed to cleanup old records:', e);
+    }
+    createWindow();
+  });
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 700,
-    height: 800,
-    minWidth: 600,
-    minHeight: 800,
-    maxWidth: 600,
-    maxHeight: 800,
+    width: 400,
+    height: 550,
+    minWidth: 400,
+    minHeight: 550,
+    maxWidth: 400,
+    maxHeight: 550,
     resizable: false,
     frame: false,          // custom titlebar
     transparent: false,
@@ -111,6 +124,20 @@ function setupIpcListeners() {
     else mainWindow?.maximize();
   });
   ipcMain.handle('window-close', () => mainWindow?.close());
+  ipcMain.handle('resize-window', (event, width, height) => {
+    if (!mainWindow) return;
+    const currentSize = mainWindow.getSize();
+    const minW = Math.min(currentSize[0], width);
+    const minH = Math.min(currentSize[1], height);
+    const maxW = Math.max(currentSize[0], width);
+    const maxH = Math.max(currentSize[1], height);
+    mainWindow.setMinimumSize(minW, minH);
+    mainWindow.setMaximumSize(maxW, maxH);
+    mainWindow.setSize(width, height);
+    mainWindow.setMinimumSize(width, height);
+    mainWindow.setMaximumSize(width, height);
+    mainWindow.center();
+  });
 
   ipcMain.handle('get-diagnostics', async () => {
     try {
@@ -252,3 +279,4 @@ app.on('activate', () => {
     createWindow();
   }
 });
+}

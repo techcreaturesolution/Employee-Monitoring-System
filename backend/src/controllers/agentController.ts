@@ -58,7 +58,7 @@ export const agentScreenshot = async (req: AuthRequest, res: Response): Promise<
         const absoluteFilePath = path.resolve(file.path);
         console.log(`📤 Uploading screenshot to Cloudinary...`);
         console.log(`   File path : ${absoluteFilePath}`);
-        console.log(`   File exists: ${require('fs').existsSync(absoluteFilePath)}`);
+        console.log(`   File exists: ${fs.existsSync(absoluteFilePath)}`);
         console.log(`   Cloud folder: ${customFolder}`);
 
         const cloudinaryResult = await uploadToCloudinary(absoluteFilePath, 'screenshots', customFolder);
@@ -104,7 +104,7 @@ export const agentScreenshot = async (req: AuthRequest, res: Response): Promise<
 
 const categorizeActivity = (appName: string, windowTitle: string, url: string): 'productive' | 'unproductive' | 'neutral' => {
   const text = `${appName} ${windowTitle} ${url}`.toLowerCase();
-  
+
   const unproductiveKeywords = ['facebook', 'twitter', 'instagram', 'youtube', 'netflix', 'whatsapp', 'telegram', 'game', 'reddit', 'tiktok'];
   const productiveKeywords = ['vscode', 'visual studio', 'antigravity', 'ems', 'github', 'gitlab', 'jira', 'confluence', 'slack', 'teams', 'figma', 'postman', 'aws', 'gcp', 'azure', 'terminal', 'powershell', 'cmd', 'idea', 'pycharm', 'webstorm', 'excel', 'word', 'powerpoint', 'docs', 'sheets', 'trello', 'asana', 'notion', 'localhost'];
 
@@ -140,8 +140,22 @@ export const agentLogActivity = async (req: AuthRequest, res: Response): Promise
       category: (a.category && a.category !== 'neutral') ? a.category : categorizeActivity(String(a.appName || ''), String(a.windowTitle || ''), String(a.url || '')),
     }));
 
-    await ActivityLog.insertMany(docs);
-    res.status(201).json({ success: true, message: 'Activities logged.' });
+    // Filter out activities that already exist in the database (matching userId and startTime)
+    const startTimes = docs.map(d => d.startTime);
+    const existingLogs = await ActivityLog.find({
+      userId,
+      startTime: { $in: startTimes }
+    }, 'startTime');
+
+    const existingTimes = new Set(existingLogs.map(e => e.startTime.getTime()));
+    const uniqueDocs = docs.filter(d => !existingTimes.has(d.startTime.getTime()));
+
+    if (uniqueDocs.length > 0) {
+      await ActivityLog.insertMany(uniqueDocs);
+      res.status(201).json({ success: true, message: `${uniqueDocs.length} activities logged.`, data: { count: uniqueDocs.length } });
+    } else {
+      res.status(200).json({ success: true, message: 'No new activities to log.', data: { count: 0 } });
+    }
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed.', error: (error as Error).message });
   }
@@ -296,7 +310,20 @@ export const agentSync = async (req: AuthRequest, res: Response): Promise<void> 
           category,
         };
       });
-      await ActivityLog.insertMany(docs);
+
+      // Filter out activities that already exist in the database (matching userId and startTime)
+      const startTimes = docs.map(d => d.startTime);
+      const existingLogs = await ActivityLog.find({
+        userId,
+        startTime: { $in: startTimes }
+      }, 'startTime');
+
+      const existingTimes = new Set(existingLogs.map(e => e.startTime.getTime()));
+      const uniqueDocs = docs.filter(d => !existingTimes.has(d.startTime.getTime()));
+
+      if (uniqueDocs.length > 0) {
+        await ActivityLog.insertMany(uniqueDocs);
+      }
     }
 
     if (idleTimeMinutes && Number(idleTimeMinutes) > 0) {

@@ -102,7 +102,7 @@ export const compressScreenshot = async (
     const filepath = path.join(screenshotDir, filename);
 
     // Validate magic bytes
-    // @ts-ignore
+    // @ts-expect-error ESM only module
     const fileType = await import('file-type');
     const detected = await fileType.fileTypeFromBuffer(req.file.buffer);
     const allowed = ['image/jpeg', 'image/png', 'image/webp'];

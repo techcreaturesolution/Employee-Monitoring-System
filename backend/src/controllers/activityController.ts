@@ -26,8 +26,22 @@ export const logActivity = async (req: AuthRequest, res: Response): Promise<void
       category: a.category || 'neutral',
     }));
 
-    const logs = await ActivityLog.insertMany(docs);
-    res.status(201).json({ success: true, message: `${logs.length} activities logged.`, data: { count: logs.length } });
+    // Filter out activities that already exist in the database (matching userId and startTime)
+    const startTimes = docs.map(d => d.startTime);
+    const existingLogs = await ActivityLog.find({
+      userId,
+      startTime: { $in: startTimes }
+    }, 'startTime');
+
+    const existingTimes = new Set(existingLogs.map(e => e.startTime.getTime()));
+    const uniqueDocs = docs.filter(d => !existingTimes.has(d.startTime.getTime()));
+
+    if (uniqueDocs.length > 0) {
+      const logs = await ActivityLog.insertMany(uniqueDocs);
+      res.status(201).json({ success: true, message: `${logs.length} activities logged.`, data: { count: logs.length } });
+    } else {
+      res.status(200).json({ success: true, message: 'No new activities to log.', data: { count: 0 } });
+    }
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to log activity.', error: (error as Error).message });
   }

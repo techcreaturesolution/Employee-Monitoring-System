@@ -360,7 +360,7 @@ interface JwtPayload {
   tenantId: string;
 }
 
-const refreshToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+const refreshToken = async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
   try {
     const token = req.cookies?.ems_refresh_token;
 

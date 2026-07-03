@@ -22,7 +22,7 @@ const redisClient = createClient({
   disableOfflineQueue: true,
 });
 
-redisClient.on('error', (err: Error) => {
+redisClient.on('error', (_err: Error) => {
   // Only log the first error to avoid flooding the console
   if (!hasLoggedDisconnect) {
     hasLoggedDisconnect = true;
@@ -53,7 +53,7 @@ export const connectRedis = async (): Promise<boolean> => {
   try {
     await redisClient.connect();
     return true;
-  } catch (err) {
+  } catch {
     logger.warn('Redis unavailable - running without cache. This is OK for development.');
     return false;
   }

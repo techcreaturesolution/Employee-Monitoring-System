@@ -57,9 +57,26 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
         style={{ WebkitAppRegion: 'drag' } as any}
       >
         <div>
-            <p className="text-xs font-bold text-white leading-none tracking-wide">EMS AGENT</p>
-            <p className="text-[10px] text-slate-500 leading-none mt-0.5">{VERSION}</p>
-          </div>
+          <p className="text-xs font-bold text-white leading-none tracking-wide">EMS AGENT</p>
+          <p className="text-[10px] text-slate-500 leading-none mt-0.5">{VERSION}</p>
+        </div>
+        <div className="flex items-center gap-1.5" style={{ WebkitAppRegion: 'no-drag' } as any}>
+          <button
+            onClick={() => eAPI()?.minimizeWindow()}
+            className="w-3 h-3 rounded-full bg-[#ffbd2e] hover:brightness-90 transition-all cursor-pointer"
+            title="Minimize"
+          />
+          <button
+            onClick={() => eAPI()?.maximizeWindow()}
+            className="w-3 h-3 rounded-full bg-[#27c93f] hover:brightness-90 transition-all cursor-pointer"
+            title="Maximize"
+          />
+          <button
+            onClick={() => eAPI()?.closeWindow()}
+            className="w-3 h-3 rounded-full bg-[#ff5f56] hover:brightness-90 transition-all cursor-pointer"
+            title="Close"
+          />
+        </div>
       </header>
 
       <div className="flex-1 flex items-center justify-center px-6">

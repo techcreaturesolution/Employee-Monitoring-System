@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimizeWindow: () => ipcRenderer.invoke('window-minimize'),
   maximizeWindow: () => ipcRenderer.invoke('window-maximize'),
   closeWindow:    () => ipcRenderer.invoke('window-close'),
+  resizeWindow:   (width, height) => ipcRenderer.invoke('resize-window', width, height),
   getDiagnostics: () => ipcRenderer.invoke('get-diagnostics'),
   getQueueCount:  () => ipcRenderer.invoke('get-queue-count'),
   setAutoStart:   (enable) => ipcRenderer.invoke('set-autostart', enable),

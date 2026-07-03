@@ -61,7 +61,7 @@ async function run() {
   const byUser: Record<string, { name: string; count: number; excessMinutes: number }> = {};
 
   for (const entry of inflated) {
-    const user = entry.userId as any;
+    const user = entry.userId as unknown as { email?: string; name?: string } | null;
     const userLabel = user?.email || String(entry.userId);
     const excess = entry.durationMinutes - CAP_MINUTES;
     totalExcessMinutes += Math.max(excess, 0);
