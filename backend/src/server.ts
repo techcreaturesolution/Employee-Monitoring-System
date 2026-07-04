@@ -1,7 +1,8 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import morgan from "morgan";
+import { requestIdMiddleware } from "./middleware/requestId.middleware";
+import { requestLogger } from "./middleware/requestLogger.middleware";
 import rateLimit from "express-rate-limit";
 import path from "path";
 import cookieParser from "cookie-parser";
@@ -87,7 +88,8 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(morgan("dev"));
+app.use(requestIdMiddleware);
+app.use(requestLogger);
 app.use(compression()); // Gzip compress responses
 
 // ============ RATE LIMITERS ============

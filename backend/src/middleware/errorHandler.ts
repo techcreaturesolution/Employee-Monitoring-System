@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-
+import { ApiResponse } from "../utils/ApiResponse";
 export class AppError extends Error {
   statusCode: number;
   isOperational: boolean;
@@ -37,11 +37,9 @@ export const errorHandler = (
 
   console.error(`[Error] ${statusCode}: ${message}`, err.stack);
 
-  res.status(statusCode).json({
-    success: false,
-    message,
-    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
-  });
+  res.status(statusCode).json(
+    ApiResponse.failure(message)
+  );
 };
 
 export const notFound = (req: Request, res: Response): void => {
