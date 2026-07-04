@@ -283,6 +283,9 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [autoStart, setAutoStart] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [topApps, setTopApps] = useState<any[]>([]);
+  const [isOnBreak, setIsOnBreak] = useState(false);
+  const [todayBreaks, setTodayBreaks] = useState<any[]>([]);
+  const [totalBreakSec, setTotalBreakSec] = useState(0);
 
 
 
@@ -418,6 +421,15 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
       const data = await res.json();
       if (data.success) {
         setTotalSec((data.data.totalWorkMinutes || 0) * 60);
+        setTotalBreakSec((data.data.totalBreakMinutes || 0) * 60);
+        
+        const breakStatus = !!data.data.isOnBreak;
+        setIsOnBreak(breakStatus);
+        setTodayBreaks(data.data.breaks || []);
+        if (eAPI() && eAPI().setBreak) {
+          eAPI().setBreak(breakStatus);
+        }
+
         if (data.data.isPunchedIn) {
           const pit = new Date(data.data.punchInTime);
           setPunchStatus('in');
@@ -475,6 +487,14 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
               ...prev.slice(0, 19)
             ]);
           }
+        });
+      }
+      if (api.onForceLogout) {
+        api.onForceLogout(() => {
+          new Notification("EMS Monitor", {
+            body: "You have been logged out because you logged out from the website."
+          });
+          handleLogout();
         });
       }
     }
@@ -603,7 +623,11 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
         } else {
           setTotalSec(elapsedSec);
           setPunchStatus('out'); setPunchInTime(null); setActivity(null);
-          if (eAPI()) eAPI().setTracking(false);
+          setIsOnBreak(false);
+          if (eAPI()) {
+            eAPI().setTracking(false);
+            if (eAPI().setBreak) eAPI().setBreak(false);
+          }
           new Notification("EMS Monitor", { body: "Punch Out successful. Tracking paused." });
           setLogs(prev => [
             { text: "Punch out successful", time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), type: 'info' },
@@ -613,6 +637,52 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
       } else { setError(data.message || 'Failed'); }
     } catch { setError('Network error'); }
     finally { setLoading(false); }
+  };
+
+  const handleBreakToggle = async () => {
+    if (punchStatus !== 'in') {
+      setError('Must be punched in to take a break.');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    const action = isOnBreak ? 'end' : 'start';
+    try {
+      const res = await customFetch(`${API_URL}/attendance/break/${action}`, {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ reason: 'Desktop agent break' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const nextBreakState = !isOnBreak;
+        setIsOnBreak(nextBreakState);
+        if (eAPI() && eAPI().setBreak) {
+          await eAPI().setBreak(nextBreakState);
+        }
+        
+        new Notification("EMS Monitor", {
+          body: nextBreakState ? "Break started. Tracking paused." : "Break ended. Tracking resumed."
+        });
+
+        setLogs(prev => [
+          {
+            text: nextBreakState ? "Break started" : "Break ended",
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            type: nextBreakState ? 'warning' : 'success'
+          },
+          ...prev.slice(0, 19)
+        ]);
+
+        await refreshAll();
+      } else {
+        setError(data.message || 'Failed to toggle break.');
+      }
+    } catch {
+      setError('Network error toggling break.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -753,9 +823,10 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                         <div className={`text-4xl font-mono font-bold tracking-tight leading-none ${overtime ? 'text-amber-400' : 'text-white'}`}>
                           <TimerDisplay punchInTime={punchInTime} active={punchStatus === 'in'} />
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-1.5">
-                          Goal: {WORK_HOURS} hrs{inAtStr && <span> • In at {inAtStr}</span>}
-                        </p>
+                        <div className="text-[11px] text-slate-500 mt-1.5 flex justify-between">
+                          <span>Goal: {WORK_HOURS} hrs{inAtStr && <span> • In at {inAtStr}</span>}</span>
+                          <span className="font-semibold text-amber-500">Break: {formatHM(totalBreakSec)}</span>
+                        </div>
                       </div>
                       <ProgressBar punchInTime={punchInTime} active={punchStatus === 'in'} />
                       <div className="flex justify-between text-[10px] text-slate-600 mb-3.5">
@@ -779,6 +850,23 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                         {Icon.punchin} Punch In
                       </button>
                     </>
+                  )}
+                  {todayBreaks && todayBreaks.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[#21262d]">
+                      <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-1.5">Today's Breaks</p>
+                      <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                        {todayBreaks.map((b: any, idx: number) => {
+                          const start = new Date(b.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                          const end = b.endTime ? new Date(b.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Active';
+                          return (
+                            <div key={idx} className="flex justify-between items-center text-[10px] p-1.5 bg-[#0d1117] rounded border border-[#21262d] text-slate-400">
+                              <span>Break #{idx + 1}</span>
+                              <span className="font-mono">{start} - {end}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
               </section>
@@ -891,7 +979,10 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                   <h2 className="text-xl font-mono font-bold text-white mt-1">
                     {punchStatus === 'in' ? <TimerDisplay punchInTime={punchInTime} active={punchStatus === 'in'} /> : '00:00:00'}
                   </h2>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Goal: 8h 00m</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5 flex justify-between">
+                    <span>Goal: 8h 00m</span>
+                    <span className="font-semibold text-amber-500">Break: {formatHM(totalBreakSec)}</span>
+                  </p>
                 </div>
                 <div className="mt-2 text-[10px] text-slate-500">
                   <p>Started at: {inAtStr || 'Not started'}</p>
@@ -1152,9 +1243,16 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
             <div className="bg-[#161b22] border border-[#21262d] rounded-xl p-4">
               <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-3">Quick Actions</p>
               <div className="grid grid-cols-4 gap-2">
-                <button className="flex flex-col items-center gap-1.5 p-2 bg-[#0d1117] border border-[#21262d] hover:border-blue-500/50 rounded-lg text-slate-300 transition-colors">
-                  <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" /></svg>
-                  <span className="text-[10px]">Start Break</span>
+                <button
+                  onClick={handleBreakToggle}
+                  className={`flex flex-col items-center gap-1.5 p-2 bg-[#0d1117] border rounded-lg transition-colors ${
+                    isOnBreak
+                      ? 'border-amber-500 hover:border-amber-400 text-amber-400'
+                      : 'border-[#21262d] hover:border-blue-500/50 text-slate-300'
+                  }`}
+                >
+                  <svg className={`w-4 h-4 ${isOnBreak ? 'text-amber-400' : 'text-blue-400'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" /></svg>
+                  <span className="text-[10px]">{isOnBreak ? 'End Break' : 'Start Break'}</span>
                 </button>
 
                 <button className="flex flex-col items-center gap-1.5 p-2 bg-[#0d1117] border border-[#21262d] hover:border-blue-500/50 rounded-lg text-slate-300 transition-colors">

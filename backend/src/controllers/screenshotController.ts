@@ -4,6 +4,8 @@
 import { Response, NextFunction } from 'express';
 import { Screenshot } from '../models/Screenshot';
 import { AuthRequest } from '../middleware/auth';
+import { User } from '../models/User';
+import { createNotification } from '../utils/notification';
 import { paginate } from '../utils/helpers';
 import path from 'path';
 import fs from 'fs';
@@ -108,6 +110,24 @@ const uploadScreenshot = async (req: AuthRequest, res: Response, next: NextFunct
     });
 
     logger.info(`[${requestId}] Screenshot saved to DB: ${screenshot._id}`);
+
+    // Notify managers and admins
+    if (tenantId) {
+      User.find({ tenantId, role: { $in: ['manager', 'company_admin'] } })
+        .then(managers => {
+          for (const mgr of managers) {
+            createNotification(req.app, {
+              tenantId,
+              userId: mgr._id as any,
+              type: 'screenshot',
+              title: 'New Screenshot',
+              message: `${req.user?.name || 'Employee'} uploaded a new screenshot.`,
+              link: '/screenshots',
+            }).catch(err => logger.error('Failed to create screenshot notification:', err));
+          }
+        })
+        .catch(err => logger.error('Failed to find managers for screenshot notification:', err));
+    }
 
     res.status(201).json({
       success: true,

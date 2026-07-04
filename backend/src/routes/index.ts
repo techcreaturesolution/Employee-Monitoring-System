@@ -13,6 +13,9 @@ import locationRoutes from './locationRoutes';
 import mobileRoutes from './mobileRoutes';
 import taskRoutes from './taskRoutes';
 import productivityRoutes from './productivityRoutes';
+import leaveRoutes from './leaveRoutes';
+import notificationRoutes from './notificationRoutes';
+import reportRoutes from './reportRoutes';
 
 const router = Router();
 
@@ -30,5 +33,8 @@ router.use('/location', locationRoutes);
 router.use('/mobile', mobileRoutes);
 router.use('/tasks', taskRoutes);
 router.use('/productivity', productivityRoutes);
+router.use('/leaves', leaveRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/reports', reportRoutes);
 
 export default router;

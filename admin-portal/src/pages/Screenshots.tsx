@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { screenshotAPI, getFullImageUrl } from '../services/api';
-import { Screenshot, Pagination } from '../types';
+import { screenshotAPI, employeeAPI, getFullImageUrl } from '../services/api';
+import { Screenshot, Pagination, User } from '../types';
 import { Camera, X, Trash2, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -8,18 +8,30 @@ import { useAuth } from '../context/AuthContext';
 const Screenshots: React.FC = () => {
   const { user } = useAuth();
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
+  const [employees, setEmployees] = useState<User[]>([]);
+  const [selectedUser, setSelectedUser] = useState('');
   const [pagination, setPagination] = useState<Pagination>({ total: 0, page: 1, limit: 20, pages: 0 });
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<Screenshot | null>(null);
   const [filterTag, setFilterTag] = useState('');
 
-  const isAdmin = user?.role === 'company_admin' || user?.role === 'super_admin';
+  const isAdmin = user?.role === 'company_admin' || user?.role === 'super_admin' || user?.role === 'manager';
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await employeeAPI.list({ limit: 100 });
+      setEmployees(res.data.data.employees || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchScreenshots = async (page = 1) => {
     setLoading(true);
     try {
       const params: Record<string, string | number> = { page, limit: 20 };
       if (filterTag) params.productivityTag = filterTag;
+      if (selectedUser) params.userId = selectedUser;
       const res = await screenshotAPI.list(params);
       setScreenshots(res.data.data.screenshots);
       setPagination(res.data.data.pagination);
@@ -31,8 +43,14 @@ const Screenshots: React.FC = () => {
   };
 
   useEffect(() => {
+    if (isAdmin) {
+      fetchEmployees();
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
     fetchScreenshots();
-  }, [filterTag]);
+  }, [filterTag, selectedUser]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this screenshot?')) return;
@@ -58,14 +76,31 @@ const Screenshots: React.FC = () => {
         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
           <Camera className="w-6 h-6 text-purple-500" /> Screenshots
         </h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && (
+            <select
+              value={selectedUser}
+              onChange={(e) => setSelectedUser(e.target.value)}
+              className="px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="">All Employees</option>
+              {employees.map((emp) => {
+                const empId = emp.id || (emp as any)._id;
+                return (
+                  <option key={empId} value={empId}>
+                    {emp.name}
+                  </option>
+                );
+              })}
+            </select>
+          )}
           <Filter className="w-4 h-4 text-slate-400" />
           <select
             value={filterTag}
             onChange={(e) => setFilterTag(e.target.value)}
             className="px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
           >
-            <option value="">All</option>
+            <option value="">All Statuses</option>
             <option value="productive">Productive</option>
             <option value="neutral">Neutral</option>
             <option value="unproductive">Unproductive</option>

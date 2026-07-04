@@ -12,12 +12,14 @@ class AgentService {
     this.syncInterval = 30 * 1000;           // 30 seconds
     this.heartbeatInterval = 30 * 1000;      // 30 seconds
     this.idleInterval = 5000;                // 5 seconds
+    this.locationInterval = 10 * 60 * 1000; // 10 minutes
 
     this.activityTimer = null;
     this.screenshotTimer = null;
     this.syncTimer = null;
     this.heartbeatTimer = null;
     this.idleTimer = null;
+    this.locationTimer = null;
     
     this.tempDir = path.join(app.getPath('temp'), 'ems-agent');
     this.offlineScreenshotsDir = path.join(app.getPath('userData'), 'offline-screenshots');
@@ -31,6 +33,7 @@ class AgentService {
     
     this.accumulatedIdleSeconds = 0;
     this.isUserIdle = false;
+    this.isOnBreak = false;
     
     // Memory buffer for activities to avoid constant SQLite writes
     this.activityBuffer = [];
@@ -61,6 +64,69 @@ class AgentService {
     this.agentKey = agentKey;
   }
 
+  handle401() {
+    console.log('[Agent] Received 401 Unauthorized from backend. Clearing tokens and stopping agent...');
+    const storage = require('./storage.cjs');
+    storage.clearTokens();
+    this.token = null;
+    this.agentKey = null;
+    this.stop();
+    
+    // Notify the renderer window
+    const { BrowserWindow } = require('electron');
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) {
+      win.webContents.send('force-logout');
+    }
+  }
+
+  setBreakStatus(isOnBreak) {
+    const wasOnBreak = this.isOnBreak;
+    this.isOnBreak = isOnBreak;
+    if (isOnBreak && !wasOnBreak) {
+      console.log('[Agent] User went on break. Flushing current activity and pausing tracking...');
+      this.flushCurrentActivity();
+      this.flushBufferToDb();
+    } else if (!isOnBreak && wasOnBreak) {
+      console.log('[Agent] User returned from break. Resuming tracking...');
+      this.activityStartTime = new Date();
+      this.lastActivityLog = null;
+    }
+  }
+
+  async fetchConfig() {
+    if (!this.token) return;
+    try {
+      this.apiBaseUrl = getApiUrl();
+      const res = await axios.get(`${this.apiBaseUrl}/agent/config`, {
+        headers: { 
+          'Authorization': `Bearer ${this.token}`,
+          'x-agent-key': this.agentKey || ''
+        },
+        timeout: 5000
+      });
+      if (res.data && res.data.success && res.data.data) {
+        const serverConfig = res.data.data;
+        if (serverConfig.screenshotInterval) {
+          const newInterval = serverConfig.screenshotInterval * 60 * 1000;
+          if (newInterval !== this.screenshotInterval) {
+            console.log(`[Agent] Updating screenshot interval from ${this.screenshotInterval / 60000}m to ${serverConfig.screenshotInterval}m`);
+            this.screenshotInterval = newInterval;
+            if (this.screenshotTimer) {
+              clearInterval(this.screenshotTimer);
+              this.screenshotTimer = setInterval(() => this.captureScreenshot(), this.screenshotInterval);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Agent] Failed to fetch config:', e.message);
+      if (e.response && e.response.status === 401) {
+        this.handle401();
+      }
+    }
+  }
+
   // ── Wait for backend to be reachable before starting timers ──────────────────
   async waitForBackend(maxAttempts = 5, delayMs = 2000) {
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -87,12 +153,16 @@ class AgentService {
     
     // Wait for backend to be ready before firing heartbeats/sync
     // (avoids ECONNREFUSED flood during initial app startup)
-    this.waitForBackend(5, 2000).then(() => {
+    this.waitForBackend(5, 2000).then(async () => {
+      await this.fetchConfig();
       this.activityTimer = setInterval(() => this.trackActivity(), this.activityInterval);
       this.screenshotTimer = setInterval(() => this.captureScreenshot(), this.screenshotInterval);
       this.syncTimer = setInterval(() => this.syncData(), this.syncInterval);
       this.heartbeatTimer = setInterval(() => this.sendHeartbeat(), this.heartbeatInterval);
       this.idleTimer = setInterval(() => this.checkIdle(), this.idleInterval);
+      
+      this.trackLocation(); // run once immediately
+      this.locationTimer = setInterval(() => this.trackLocation(), this.locationInterval);
     });
   }
 
@@ -102,6 +172,7 @@ class AgentService {
     if (this.syncTimer) { clearInterval(this.syncTimer); this.syncTimer = null; }
     if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
     if (this.idleTimer) { clearInterval(this.idleTimer); this.idleTimer = null; }
+    if (this.locationTimer) { clearInterval(this.locationTimer); this.locationTimer = null; }
     
     this.flushCurrentActivity();
     // Flush remaining buffered memory activities to SQLite before stopping
@@ -168,8 +239,11 @@ class AgentService {
   async sendHeartbeat() {
     if (!this.token) return;
     try {
+      // Periodically refresh config on heartbeat
+      await this.fetchConfig();
+
       this.apiBaseUrl = getApiUrl();
-      const status = this.isUserIdle ? 'idle' : 'working';
+      const status = this.isOnBreak ? 'break' : (this.isUserIdle ? 'idle' : 'working');
       await axios.post(`${this.apiBaseUrl}/agent/heartbeat`, {
         status,
         version: '1.2.0',
@@ -183,8 +257,9 @@ class AgentService {
         timeout: 5000,
       });
     } catch (e) {
-      // Only log if not a simple 'backend not ready' ECONNREFUSED
-      if (e.code !== 'ECONNREFUSED') {
+      if (e.response && e.response.status === 401) {
+        this.handle401();
+      } else if (e.code !== 'ECONNREFUSED') {
         console.error('Heartbeat failed', e.message);
       } else {
         console.warn('[Agent] Heartbeat skipped — backend not reachable (offline mode)');
@@ -192,7 +267,68 @@ class AgentService {
     }
   }
 
+  async fetchIPLocation() {
+    try {
+      const res = await axios.get('https://freeipapi.com/api/json', { timeout: 5000 });
+      if (res.data && res.data.latitude && res.data.longitude) {
+        const address = [res.data.cityName, res.data.regionName, res.data.countryName].filter(Boolean).join(', ');
+        return {
+          latitude: res.data.latitude,
+          longitude: res.data.longitude,
+          address: address || 'IP Location'
+        };
+      }
+    } catch (err) {
+      console.warn('[Agent] freeipapi.com failed, trying ip-api.com...');
+      try {
+        const res = await axios.get('http://ip-api.com/json/', { timeout: 5000 });
+        if (res.data && res.data.status === 'success') {
+          const address = [res.data.city, res.data.regionName, res.data.country].filter(Boolean).join(', ');
+          return {
+            latitude: res.data.lat,
+            longitude: res.data.lon,
+            address: address || 'IP Location'
+          };
+        }
+      } catch (err2) {
+        console.error('[Agent] All IP location services failed:', err2.message);
+      }
+    }
+    return null;
+  }
+
+  async trackLocation() {
+    if (!this.token) return;
+    try {
+      console.log('[Agent] Fetching live location...');
+      const locationData = await this.fetchIPLocation();
+      if (locationData) {
+        console.log('[Agent] Current Location resolved:', locationData);
+        this.apiBaseUrl = getApiUrl();
+        await axios.post(`${this.apiBaseUrl}/location/track`, {
+          latitude: locationData.latitude,
+          longitude: locationData.longitude,
+          accuracy: 100,
+          address: locationData.address,
+          source: 'agent',
+          batteryLevel: 100,
+          networkType: 'WiFi'
+        }, {
+          headers: { 
+            'Authorization': `Bearer ${this.token}`,
+            'x-agent-key': this.agentKey || ''
+          },
+          timeout: 5000
+        });
+        console.log('[Agent] Location tracked successfully');
+      }
+    } catch (e) {
+      console.error('[Agent] Location tracking failed:', e.message);
+    }
+  }
+
   async trackActivity() {
+    if (this.isOnBreak) return;
     try {
       const activeWin = (await import('active-win')).default;
       const win = await activeWin();
@@ -259,6 +395,10 @@ class AgentService {
       console.log('Skipping screenshot capture because employee is idle');
       return;
     }
+    if (this.isOnBreak) {
+      console.log('Skipping screenshot capture because employee is on break');
+      return;
+    }
     
     let filepath = '';
     let filename = '';
@@ -304,6 +444,10 @@ class AgentService {
       fs.unlinkSync(filepath);
     } catch (e) {
       console.error('Failed to capture screenshot, queueing offline:', e.message);
+      if (e.response && e.response.status === 401) {
+        this.handle401();
+        return;
+      }
       if (filepath && fs.existsSync(filepath)) {
         try {
           const offlinePath = path.join(this.offlineScreenshotsDir, filename);
@@ -353,6 +497,10 @@ class AgentService {
         }
       }
     } catch (e) {
+      if (e.response && e.response.status === 401) {
+        this.handle401();
+        return;
+      }
       // Distinguish offline from real error
       if (e.code === 'ECONNREFUSED') {
         console.warn('[Agent] Activity sync skipped — backend offline, buffering to disk');
@@ -396,6 +544,10 @@ class AgentService {
             console.warn(`Screenshot ${s.id} rejected by server, skipping.`);
           }
         } catch (uploadErr) {
+          if (uploadErr.response && uploadErr.response.status === 401) {
+            this.handle401();
+            break;
+          }
           const isNetworkDown = uploadErr.code && 
             ['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENETUNREACH', 'ENOTFOUND'].includes(uploadErr.code);
           if (isNetworkDown) {

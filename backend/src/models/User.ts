@@ -19,6 +19,14 @@ export interface IUser extends Document {
   workMode: 'office' | 'wfh' | 'field';
   deviceFingerprints: string[];
   mustChangePassword?: boolean;
+  agentNeedsLogout?: boolean;
+  preferences?: {
+    theme: 'light' | 'dark' | 'system';
+    language: string;
+    notifyEmail: boolean;
+    notifyPush: boolean;
+    privacyShareLocation: boolean;
+  };
 
   lastKnownLocation: {
     latitude: number;
@@ -63,6 +71,14 @@ const userSchema = new Schema<IUser>(
     },
     deviceFingerprints: [{ type: String }],
     mustChangePassword: { type: Boolean, default: false },
+    agentNeedsLogout:   { type: Boolean, default: false },
+    preferences: {
+      theme: { type: String, enum: ['light', 'dark', 'system'], default: 'system' },
+      language: { type: String, default: 'en' },
+      notifyEmail: { type: Boolean, default: true },
+      notifyPush: { type: Boolean, default: true },
+      privacyShareLocation: { type: Boolean, default: true },
+    },
 
     lastKnownLocation: {
       latitude:  { type: Number, default: 0 },

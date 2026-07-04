@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { User } from '../models/User';
+import { createNotification } from '../utils/notification';
 import { Screenshot } from '../models/Screenshot';
 import { ActivityLog } from '../models/ActivityLog';
 import { Attendance } from '../models/Attendance';
@@ -95,6 +96,24 @@ export const agentScreenshot = async (req: AuthRequest, res: Response): Promise<
         uploadedToCloud,
       },
     });
+
+    // Notify managers and admins
+    if (tenantId) {
+      User.find({ tenantId, role: { $in: ['manager', 'company_admin'] } })
+        .then(managers => {
+          for (const mgr of managers) {
+            createNotification(req.app, {
+              tenantId,
+              userId: mgr._id as any,
+              type: 'screenshot',
+              title: 'New Agent Screenshot',
+              message: `${req.user?.name || 'Employee'} uploaded a new agent screenshot.`,
+              link: '/screenshots',
+            }).catch(err => console.error('Failed to create agent screenshot notification:', err));
+          }
+        })
+        .catch(err => console.error('Failed to find managers for agent screenshot notification:', err));
+    }
 
     res.status(201).json({ success: true, data: screenshot });
   } catch (error) {
@@ -212,9 +231,29 @@ export const getAgentStatus = async (req: AuthRequest, res: Response): Promise<v
     const attendance = await Attendance.findOne({ userId, date: today });
     const isPunchedIn = attendance ? !!attendance.punchIn && !attendance.punchOut : false;
     const punchInTime = attendance?.punchIn ? attendance.punchIn.time : null;
-    const totalWorkMinutes = attendance?.totalWorkMinutes || 0;
+    
+    let totalBreakMinutes = 0;
+    if (attendance) {
+      let breakSum = attendance.breaks.reduce((sum, b) => sum + (b.duration || 0), 0);
+      const activeBreak = attendance.breaks.find((b) => !b.endTime);
+      if (activeBreak) {
+        const elapsedActiveBreak = calculateWorkMinutes(activeBreak.startTime, new Date());
+        breakSum += elapsedActiveBreak;
+      }
+      totalBreakMinutes = breakSum;
+    }
 
-    res.status(200).json({ success: true, data: { isPunchedIn, punchInTime, totalWorkMinutes } });
+    let totalWorkMinutes = attendance?.totalWorkMinutes || 0;
+    if (attendance && attendance.punchIn && !attendance.punchOut) {
+      const elapsed = calculateWorkMinutes(attendance.punchIn.time, new Date());
+      const idleTime = attendance.idleMinutes || 0;
+      totalWorkMinutes = Math.max(0, elapsed - totalBreakMinutes - idleTime);
+    }
+
+    const activeBreak = attendance?.breaks.find((b) => !b.endTime);
+    const isOnBreak = !!activeBreak;
+
+    res.status(200).json({ success: true, data: { isPunchedIn, punchInTime, totalWorkMinutes, totalBreakMinutes, isOnBreak, breaks: attendance?.breaks || [] } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch status.', error: (error as Error).message });
   }

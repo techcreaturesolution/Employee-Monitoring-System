@@ -1,6 +1,9 @@
 import { Response, NextFunction } from 'express';
 import { Attendance } from '../models/Attendance';
 import { AuthRequest } from '../middleware/auth';
+import { Tenant } from '../models/Tenant';
+import { User } from '../models/User';
+import { createNotification } from '../utils/notification';
 import { formatDate, calculateWorkMinutes, paginate } from '../utils/helpers';
 import { logger } from '../utils/logger';
 
@@ -28,8 +31,46 @@ const punchIn = async (req: AuthRequest, res: Response, next: NextFunction): Pro
       method: method || 'web',
       isInsideGeofence: false,
     };
-    attendance.status = 'present';
+    const tenant = await Tenant.findById(tenantId);
+    let isLate = false;
+    if (tenant?.settings?.workStartTime) {
+      const [startHour, startMin] = tenant.settings.workStartTime.split(':').map(Number);
+      const now = new Date();
+      const nowHour = now.getHours();
+      const nowMin = now.getMinutes();
+      if (nowHour > startHour || (nowHour === startHour && nowMin > startMin)) {
+        isLate = true;
+      }
+    }
+
+    attendance.status = isLate ? 'late' : 'present';
     await attendance.save();
+
+    if (isLate) {
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      createNotification(req.app, {
+        tenantId: tenantId!,
+        userId: userId!,
+        type: 'attendance',
+        title: 'Late Punch-in Alert',
+        message: `You punched in late today at ${timeStr}.`,
+      }).catch(err => logger.error('Failed to notify employee of late punch-in:', err));
+
+      User.find({ tenantId, role: { $in: ['manager', 'company_admin'] } })
+        .then(managers => {
+          for (const mgr of managers) {
+            createNotification(req.app, {
+              tenantId: tenantId!,
+              userId: mgr._id as any,
+              type: 'attendance',
+              title: 'Late Punch-in Alert',
+              message: `${req.user?.name} punched in late today at ${timeStr}.`,
+              link: '/attendance',
+            }).catch(err => logger.error('Failed to notify manager of late punch-in:', err));
+          }
+        })
+        .catch(err => logger.error('Failed to find managers for late punch-in notification:', err));
+    }
 
     res.status(201).json({ success: true, message: 'Punched in successfully.', data: attendance });
   } catch (error) {
@@ -146,6 +187,19 @@ const endBreak = async (req: AuthRequest, res: Response, next: NextFunction): Pr
 
     activeBreak.endTime = new Date();
     activeBreak.duration = calculateWorkMinutes(activeBreak.startTime, activeBreak.endTime);
+
+    // Recalculate total break minutes
+    const totalBreak = attendance.breaks.reduce((sum, b) => sum + (b.duration || 0), 0);
+    attendance.totalBreakMinutes = totalBreak;
+
+    // Recalculate total work minutes so far
+    if (attendance.punchIn) {
+      const currentEndTime = attendance.punchOut?.time || new Date();
+      const totalWork = calculateWorkMinutes(attendance.punchIn.time, currentEndTime);
+      const idleTime = attendance.idleMinutes || 0;
+      attendance.totalWorkMinutes = Math.max(0, totalWork - totalBreak - idleTime);
+    }
+
     await attendance.save();
 
     res.json({ success: true, message: 'Break ended.', data: attendance });
@@ -161,7 +215,22 @@ const getTodayAttendance = async (req: AuthRequest, res: Response, next: NextFun
     const today = formatDate(new Date());
 
     const attendance = await Attendance.findOne({ userId, date: today });
-    res.json({ success: true, data: attendance || null });
+    const attendanceObj = attendance ? attendance.toObject() : null;
+    if (attendanceObj && attendanceObj.punchIn && !attendanceObj.punchOut) {
+      let breakSum = attendanceObj.breaks.reduce((sum: number, b: any) => sum + (b.duration || 0), 0);
+      const activeBreak = attendanceObj.breaks.find((b: any) => !b.endTime);
+      if (activeBreak) {
+        const elapsedActiveBreak = calculateWorkMinutes(activeBreak.startTime, new Date());
+        breakSum += elapsedActiveBreak;
+      }
+      attendanceObj.totalBreakMinutes = breakSum;
+
+      const elapsed = calculateWorkMinutes(attendanceObj.punchIn.time, new Date());
+      const idleTime = attendanceObj.idleMinutes || 0;
+      attendanceObj.totalWorkMinutes = Math.max(0, elapsed - breakSum - idleTime);
+    }
+
+    res.json({ success: true, data: attendanceObj });
   } catch (error) {
     logger.error('getTodayAttendance failed:', error);
     next(error);
@@ -197,10 +266,29 @@ const getAttendanceHistory = async (req: AuthRequest, res: Response, next: NextF
       Attendance.countDocuments(filter),
     ]);
 
+    const todayStr = formatDate(new Date());
+    const updatedRecords = records.map((record) => {
+      const obj = record.toObject();
+      if (obj.date === todayStr && obj.punchIn && !obj.punchOut) {
+        let breakSum = obj.breaks.reduce((sum: number, b: any) => sum + (b.duration || 0), 0);
+        const activeBreak = obj.breaks.find((b: any) => !b.endTime);
+        if (activeBreak) {
+          const elapsedActiveBreak = calculateWorkMinutes(activeBreak.startTime, new Date());
+          breakSum += elapsedActiveBreak;
+        }
+        obj.totalBreakMinutes = breakSum;
+
+        const elapsed = calculateWorkMinutes(obj.punchIn.time, new Date());
+        const idleTime = obj.idleMinutes || 0;
+        obj.totalWorkMinutes = Math.max(0, elapsed - breakSum - idleTime);
+      }
+      return obj;
+    });
+
     res.json({
       success: true,
       data: {
-        records,
+        records: updatedRecords,
         pagination: { total, page: Number(page), limit: lim, pages: Math.ceil(total / lim) },
       },
     });

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { locationAPI } from '../services/api';
-import { LiveEmployeeLocation, LocationLog as LocationLogType } from '../types';
+import { locationAPI, employeeAPI } from '../services/api';
+import { LiveEmployeeLocation, LocationLog as LocationLogType, User } from '../types';
 import { MapPin, Navigation, RefreshCw, Wifi, WifiOff, Home, Building2, Briefcase, Clock } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -12,12 +12,22 @@ const workModeConfig = {
 
 const LocationTracker: React.FC = () => {
   const [liveLocations, setLiveLocations] = useState<LiveEmployeeLocation[]>([]);
+  const [employees, setEmployees] = useState<User[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [trail, setTrail] = useState<LocationLogType[]>([]);
   const [trailDate, setTrailDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [view, setView] = useState<'live' | 'history'>('live');
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await employeeAPI.list({ limit: 100 });
+      setEmployees(res.data.data.employees || []);
+    } catch (e) {
+      console.error('Failed to fetch employees list:', e);
+    }
+  };
 
   const fetchLive = async () => {
     try {
@@ -44,6 +54,7 @@ const LocationTracker: React.FC = () => {
 
   useEffect(() => {
     fetchLive();
+    fetchEmployees();
     const interval = setInterval(fetchLive, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -262,11 +273,14 @@ const LocationTracker: React.FC = () => {
                   className="px-3 py-2 border rounded-lg text-sm min-w-[200px]"
                 >
                   <option value="">Select Employee</option>
-                  {liveLocations.map((e) => (
-                    <option key={e.userId} value={e.userId}>
-                      {e.name}
-                    </option>
-                  ))}
+                  {employees.map((e) => {
+                    const empId = e.id || (e as any)._id;
+                    return (
+                      <option key={empId} value={empId}>
+                        {e.name}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>

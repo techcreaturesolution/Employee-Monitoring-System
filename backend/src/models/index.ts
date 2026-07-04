@@ -8,3 +8,4 @@ export { Subscription, ISubscription } from './Subscription';
 export { Notification, INotification } from './Notification';
 export { LocationLog, ILocationLog } from './LocationLog';
 export { ProductivityKeyword, IProductivityKeyword } from './ProductivityKeyword';
+export { Leave, ILeave } from './Leave';

@@ -61,6 +61,20 @@ function createWindow() {
   mainWindow.loadURL(startUrl);
 
   mainWindow.on('close', (e) => {
+    const storage = require('./storage.cjs');
+    const token = storage.getToken();
+    if (token) {
+      e.preventDefault();
+      const { dialog } = require('electron');
+      dialog.showMessageBoxSync(mainWindow, {
+        type: 'warning',
+        title: 'EMS Agent',
+        message: 'First logout then close app.',
+        buttons: ['OK']
+      });
+      return;
+    }
+
     if (!isQuitting) {
       e.preventDefault();
       mainWindow.hide();
@@ -96,6 +110,17 @@ function createTray() {
       { type: 'separator' },
       {
         label: 'Exit App', click: () => {
+          const storage = require('./storage.cjs');
+          const token = storage.getToken();
+          if (token) {
+            dialog.showMessageBoxSync(mainWindow, {
+              type: 'warning',
+              title: 'EMS Agent',
+              message: 'First logout then close app.',
+              buttons: ['OK']
+            });
+            return;
+          }
           isQuitting = true;
           app.quit();
         }
@@ -240,6 +265,11 @@ function setupIpcListeners() {
     } else {
       agentService.stop();
     }
+    return true;
+  });
+
+  ipcMain.handle('set-break', (event, isOnBreak) => {
+    agentService.setBreakStatus(isOnBreak);
     return true;
   });
 

@@ -11,6 +11,7 @@ const Attendance: React.FC = () => {
   const [history, setHistory] = useState<AttendanceType[]>([]);
   const [loading, setLoading] = useState(true);
   const [punching, setPunching] = useState(false);
+  const [selectedRecordBreaks, setSelectedRecordBreaks] = useState<AttendanceType | null>(null);
 
   const isAdmin = user?.role === 'company_admin' || user?.role === 'super_admin' || user?.role === 'manager';
 
@@ -104,88 +105,114 @@ const Attendance: React.FC = () => {
       <Toaster position="top-right" />
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Attendance</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div className="bg-white rounded-xl p-6 shadow-sm border col-span-1">
+      <div className="space-y-6">
+        {/* Today Card */}
+        <div className="bg-white rounded-xl p-6 shadow-sm border">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Clock className="w-5 h-5 text-blue-500" /> Today
           </h3>
 
-          <div className="space-y-4">
-            <div className="flex justify-between items-center py-2 border-b">
-              <span className="text-sm text-slate-500">Punch In</span>
-              <span className="font-medium">
-                {todayAttendance?.punchIn?.time ? formatTime(todayAttendance.punchIn.time) : '-'}
-              </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-sm text-slate-500">Punch In</span>
+                <span className="font-medium">
+                  {todayAttendance?.punchIn?.time ? formatTime(todayAttendance.punchIn.time) : '-'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-sm text-slate-500">Punch Out</span>
+                <span className="font-medium">
+                  {todayAttendance?.punchOut?.time ? formatTime(todayAttendance.punchOut.time) : '-'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-sm text-slate-500">Total Work</span>
+                <span className="font-medium">{formatMinutes(todayAttendance?.totalWorkMinutes || 0)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b">
+                <span className="text-sm text-slate-500">Breaks</span>
+                <span className="font-medium">{formatMinutes(todayAttendance?.totalBreakMinutes || 0)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-sm text-slate-500">Status</span>
+                <span className={`text-xs px-2 py-1 rounded-full ${todayAttendance?.status === 'present' ? 'bg-green-100 text-green-700' :
+                  todayAttendance?.status === 'late' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-slate-100 text-slate-500'
+                  }`}>
+                  {todayAttendance?.status || 'Not Punched In'}
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between items-center py-2 border-b">
-              <span className="text-sm text-slate-500">Punch Out</span>
-              <span className="font-medium">
-                {todayAttendance?.punchOut?.time ? formatTime(todayAttendance.punchOut.time) : '-'}
-              </span>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b">
-              <span className="text-sm text-slate-500">Total Work</span>
-              <span className="font-medium">{formatMinutes(todayAttendance?.totalWorkMinutes || 0)}</span>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b">
-              <span className="text-sm text-slate-500">Breaks</span>
-              <span className="font-medium">{formatMinutes(todayAttendance?.totalBreakMinutes || 0)}</span>
-            </div>
-            <div className="flex justify-between items-center py-2">
-              <span className="text-sm text-slate-500">Status</span>
-              <span className={`text-xs px-2 py-1 rounded-full ${todayAttendance?.status === 'present' ? 'bg-green-100 text-green-700' :
-                todayAttendance?.status === 'late' ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-slate-100 text-slate-500'
-                }`}>
-                {todayAttendance?.status || 'Not Punched In'}
-              </span>
-            </div>
-          </div>
 
-          <div className="mt-6 space-y-3">
-            {!todayAttendance?.punchIn?.time && (
-              <button
-                onClick={handlePunchIn}
-                disabled={punching}
-                className="w-full flex items-center justify-center gap-2 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
-              >
-                <LogIn className="w-5 h-5" />
-                {punching ? 'Punching...' : 'Punch In'}
-              </button>
-            )}
+            <div className="flex flex-col justify-between">
+              {todayAttendance?.breaks && todayAttendance.breaks.length > 0 ? (
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Today's Breaks</h4>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {todayAttendance.breaks.map((b: any, idx: number) => (
+                      <div key={idx} className="flex justify-between items-center text-xs p-2 bg-slate-50 rounded border">
+                        <span className="font-medium text-slate-600">Break #{idx + 1}</span>
+                        <span className="text-slate-500">
+                          {formatTime(b.startTime)} - {b.endTime ? formatTime(b.endTime) : 'Active'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center p-6 border-2 border-dashed border-slate-100 rounded-lg text-slate-400 text-xs italic mb-4">
+                  No breaks taken today
+                </div>
+              )}
 
-            {isPunchedIn && !todayAttendance?.punchOut?.time && (
-              <>
-                <button
-                  onClick={handlePunchOut}
-                  disabled={punching}
-                  className="w-full flex items-center justify-center gap-2 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
-                >
-                  <LogOut className="w-5 h-5" />
-                  {punching ? 'Punching...' : 'Punch Out'}
-                </button>
-
-                {!isOnBreak ? (
+              <div className="mt-4 space-y-3">
+                {!todayAttendance?.punchIn?.time && (
                   <button
-                    onClick={() => handleBreak('start')}
-                    className="w-full flex items-center justify-center gap-2 bg-amber-500 text-white py-2.5 rounded-lg hover:bg-amber-600 font-medium"
+                    onClick={handlePunchIn}
+                    disabled={punching}
+                    className="w-full flex items-center justify-center gap-2 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 font-medium"
                   >
-                    <Coffee className="w-4 h-4" /> Start Break
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleBreak('end')}
-                    className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 font-medium"
-                  >
-                    <Play className="w-4 h-4" /> End Break
+                    <LogIn className="w-5 h-5" />
+                    {punching ? 'Punching...' : 'Punch In'}
                   </button>
                 )}
-              </>
-            )}
+
+                {isPunchedIn && !todayAttendance?.punchOut?.time && (
+                  <>
+                    <button
+                      onClick={handlePunchOut}
+                      disabled={punching}
+                      className="w-full flex items-center justify-center gap-2 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 font-medium"
+                    >
+                      <LogOut className="w-5 h-5" />
+                      {punching ? 'Punching...' : 'Punch Out'}
+                    </button>
+
+                    {!isOnBreak ? (
+                      <button
+                        onClick={() => handleBreak('start')}
+                        className="w-full flex items-center justify-center gap-2 bg-amber-500 text-white py-2.5 rounded-lg hover:bg-amber-600 font-medium"
+                      >
+                        <Coffee className="w-4 h-4" /> Start Break
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleBreak('end')}
+                        className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 font-medium"
+                      >
+                        <Play className="w-4 h-4" /> End Break
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border col-span-1 lg:col-span-2">
+        {/* History Card */}
+        <div className="bg-white rounded-xl shadow-sm border">
           <div className="p-4 border-b">
             <h3 className="text-lg font-semibold">Attendance History</h3>
           </div>
@@ -198,6 +225,7 @@ const Attendance: React.FC = () => {
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase">Punch In</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase">Punch Out</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase">Work Hours</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase">Breaks</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase">Status</th>
                 </tr>
               </thead>
@@ -213,6 +241,18 @@ const Attendance: React.FC = () => {
                     <td className="px-4 py-3 text-sm">{record.punchIn?.time ? formatTime(record.punchIn.time) : '-'}</td>
                     <td className="px-4 py-3 text-sm">{record.punchOut?.time ? formatTime(record.punchOut.time) : '-'}</td>
                     <td className="px-4 py-3 text-sm font-medium">{formatMinutes(record.totalWorkMinutes || 0)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {record.breaks && record.breaks.length > 0 ? (
+                        <button
+                          onClick={() => setSelectedRecordBreaks(record)}
+                          className="text-blue-600 hover:underline font-medium text-left"
+                        >
+                          {record.breaks.length} breaks ({formatMinutes(record.totalBreakMinutes || 0)})
+                        </button>
+                      ) : (
+                        <span className="text-slate-400">0 breaks</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-1 rounded-full ${record.status === 'present' ? 'bg-green-100 text-green-700' :
                         record.status === 'late' ? 'bg-yellow-100 text-yellow-700' :
@@ -225,13 +265,62 @@ const Attendance: React.FC = () => {
                   </tr>
                 ))}
                 {history.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No attendance records yet</td></tr>
+                  <tr><td colSpan={isAdmin ? 7 : 6} className="px-4 py-8 text-center text-slate-400">No attendance records yet</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
       </div>
+
+      {/* Break History Modal */}
+      {selectedRecordBreaks && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-slate-800">
+                Break History ({selectedRecordBreaks.date})
+              </h3>
+              <button
+                onClick={() => setSelectedRecordBreaks(null)}
+                className="text-slate-500 hover:text-slate-800 text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="max-h-60 overflow-y-auto space-y-2.5">
+              {selectedRecordBreaks.breaks.map((b: any, idx: number) => (
+                <div key={idx} className="p-3 bg-slate-50 rounded-lg border flex flex-col gap-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-slate-700">Break #{idx + 1}</span>
+                    <span className="text-xs text-slate-500 font-medium bg-slate-200 px-2 py-0.5 rounded-full">
+                      {b.duration ? `${b.duration} mins` : 'Active'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 text-xs text-slate-600 mt-1">
+                    <div>
+                      <span className="block font-medium text-slate-400">Started</span>
+                      {formatTime(b.startTime)}
+                    </div>
+                    <div>
+                      <span className="block font-medium text-slate-400">Ended</span>
+                      {b.endTime ? formatTime(b.endTime) : 'Running...'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setSelectedRecordBreaks(null)}
+              className="mt-6 w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -69,6 +69,8 @@ const io = new SocketServer(httpServer, {
   },
 });
 
+app.set('io', io);
+
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({
   origin: function (origin, callback) {
@@ -189,6 +191,10 @@ io.on('connection', (socket: any) => {
   logger.info(
     `✅ User ${socket.userId} (tenant: ${socket.tenantId}) connected`
   );
+
+  if (socket.userId) {
+    socket.join(socket.userId.toString());
+  }
 
   // Join tenant room
   socket.on('join-tenant', (requestedTenantId: string) => {

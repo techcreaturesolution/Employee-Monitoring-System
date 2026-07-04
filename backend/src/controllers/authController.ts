@@ -2,11 +2,13 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 import { Tenant } from '../models/Tenant';
-import { generateTokens, generateAgentKey } from '../utils/helpers';
+import { Attendance } from '../models/Attendance';
+import { generateTokens, generateAgentKey, formatDate, calculateWorkMinutes } from '../utils/helpers';
 import { AuthRequest } from '../middleware/auth';
 import { registerSchema, loginSchema } from '../validators/authValidator';
 import { z } from 'zod';
 import { config } from '../config';
+import { cache } from '../services/cache';
 import { logger } from '../utils/logger';
 import { uploadToCloudinary } from '../utils/cloudinary';
 
@@ -193,6 +195,7 @@ const login = async (req: Request, res: Response, next: NextFunction): Promise<v
           designation: user.designation,
           avatar: user.avatar,
           agentKey: user.agentKey,
+          preferences: user.preferences,
         },
         tenant: tenant
           ? {
@@ -243,6 +246,7 @@ const getMe = async (req: AuthRequest, res: Response, next: NextFunction): Promi
           agentKey: user.agentKey,
           lastActive: user.lastActive,
           isOnline: user.isOnline,
+          preferences: user.preferences,
         },
         tenant: tenant
           ? {
@@ -267,6 +271,13 @@ const updateProfileSchema = z.object({
   avatar: z.string().url().max(500).optional(),
   department: z.string().max(100).trim().optional(),
   designation: z.string().max(100).trim().optional(),
+  preferences: z.object({
+    theme: z.enum(['light', 'dark', 'system']).optional(),
+    language: z.string().optional(),
+    notifyEmail: z.boolean().optional(),
+    notifyPush: z.boolean().optional(),
+    privacyShareLocation: z.boolean().optional(),
+  }).optional(),
 });
 
 const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -305,6 +316,34 @@ const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction
 
 const logout = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
+    const userId = req.user?._id;
+    if (userId) {
+      // 1. Mark that the desktop agent needs to log out
+      await User.findByIdAndUpdate(userId, { agentNeedsLogout: true });
+      await cache.delete(`user:${userId}`);
+      
+      // 2. Punch out if punched in today
+      const today = formatDate(new Date());
+      const attendance = await Attendance.findOne({ userId, date: today });
+      if (attendance && attendance.punchIn && !attendance.punchOut) {
+        attendance.punchOut = {
+          time: new Date(),
+          ip: req.ip || '',
+          location: req.body?.location || { latitude: 0, longitude: 0, address: '', accuracy: 0 },
+          screenshotUrl: '',
+          method: 'agent',
+          isInsideGeofence: false,
+        };
+        const totalBreak = attendance.breaks.reduce((sum, b) => sum + (b.duration || 0), 0);
+        const totalWork = calculateWorkMinutes(attendance.punchIn.time, attendance.punchOut.time);
+        const idleTime = attendance.idleMinutes || 0;
+        attendance.totalWorkMinutes = Math.max(0, totalWork - totalBreak - idleTime);
+        attendance.totalBreakMinutes = totalBreak;
+        await attendance.save();
+        logger.info(`Automatically punched out user ${userId} on logout`);
+      }
+    }
+
     res.clearCookie('ems_token', { path: '/', httpOnly: true, secure: config.nodeEnv === 'production', sameSite: config.nodeEnv === 'production' ? 'none' : 'lax' });
     res.clearCookie('ems_refresh_token', { path: '/', httpOnly: true, secure: config.nodeEnv === 'production', sameSite: config.nodeEnv === 'production' ? 'none' : 'lax' });
     res.json({ success: true, message: 'Logged out successfully.' });
@@ -408,4 +447,33 @@ const refreshToken = async (req: Request, res: Response, _next: NextFunction): P
   }
 };
 
-export { register, login, getMe, updateProfile, logout, uploadAvatarController, refreshToken };
+const changePassword = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const schema = z.object({
+      currentPassword: z.string().min(1),
+      newPassword: z.string().min(8),
+    });
+    const { currentPassword, newPassword } = schema.parse(req.body);
+
+    const user = await User.findById(req.user!._id).select('+password');
+    if (!user) {
+      res.status(401).json({ success: false, message: 'Not authenticated.' });
+      return;
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      res.status(401).json({ success: false, message: 'Current password is incorrect.' });
+      return;
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ success: true, message: 'Password changed successfully.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export { register, login, getMe, updateProfile, logout, uploadAvatarController, refreshToken, changePassword };

@@ -29,6 +29,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = () => {
+    const confirmLogout = window.confirm(
+      "Logging out will stop tracking and logout both the desktop app and web dashboard. Are you sure you want to log out?"
+    );
+    if (!confirmLogout) return;
     logout();
     navigate('/login');
   };

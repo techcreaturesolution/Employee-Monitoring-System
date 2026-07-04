@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onScreenshotCaptured: (callback) => ipcRenderer.on('screenshot-captured', (event, ...args) => callback(...args)),
   onUserIdle: (callback) => ipcRenderer.on('user-idle', () => callback()),
   onIdleStatusChanged: (callback) => ipcRenderer.on('idle-status-changed', (event, data) => callback(data)),
+  onForceLogout: (callback) => ipcRenderer.on('force-logout', () => callback()),
   // Window controls (for frameless window)
   minimizeWindow: () => ipcRenderer.invoke('window-minimize'),
   maximizeWindow: () => ipcRenderer.invoke('window-maximize'),
@@ -21,4 +22,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setAutoStart:   (enable) => ipcRenderer.invoke('set-autostart', enable),
   getAutoStart:   () => ipcRenderer.invoke('get-autostart'),
   setTracking:    (start) => ipcRenderer.invoke('set-tracking', start),
+  setBreak:       (isOnBreak) => ipcRenderer.invoke('set-break', isOnBreak),
 });

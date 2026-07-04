@@ -42,6 +42,14 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       return;
     }
 
+    if (user.agentNeedsLogout) {
+      user.agentNeedsLogout = false;
+      await user.save();
+      await cache.delete(`user:${user._id}`);
+      res.status(401).json({ success: false, message: 'User force logged out.' });
+      return;
+    }
+
     req.user = user;
     next();
   } catch {
@@ -70,6 +78,14 @@ export const authenticateAgent = async (req: AuthRequest, res: Response, next: N
     const user = await User.findOne({ agentKey, status: 'active' });
     if (!user) {
       res.status(401).json({ success: false, message: 'Invalid agent key.' });
+      return;
+    }
+
+    if (user.agentNeedsLogout) {
+      user.agentNeedsLogout = false;
+      await user.save();
+      await cache.delete(`user:${user._id}`);
+      res.status(401).json({ success: false, message: 'Agent force logged out.' });
       return;
     }
 

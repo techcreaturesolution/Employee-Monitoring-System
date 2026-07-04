@@ -71,7 +71,7 @@ export const updateTask = async (req: AuthRequest, res: Response, next: NextFunc
     const { id } = req.params;
     const { title, deadline, done, projectId } = req.body;
 
-    const task = await Task.findById(id);
+    const task = await Task.findOne({ _id: id, tenantId: req.user?.tenantId });
     if (!task) {
       res.status(404).json({ success: false, message: 'Task not found' });
       return;

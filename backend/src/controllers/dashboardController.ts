@@ -8,7 +8,7 @@ import { Attendance } from '../models/Attendance';
 import { Screenshot } from '../models/Screenshot';
 import { ActivityLog } from '../models/ActivityLog';
 import { AuthRequest } from '../middleware/auth';
-import { formatDate } from '../utils/helpers';
+import { formatDate, calculateWorkMinutes } from '../utils/helpers';
 import { logger } from '../utils/logger';
 
 const getAdminDashboard = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -38,7 +38,7 @@ const getAdminDashboard = async (req: AuthRequest, res: Response, next: NextFunc
       User.countDocuments({ tenantId: tenantObjId, status: 'active', role: { $ne: 'super_admin' } }),
       Attendance.countDocuments({ tenantId: tenantObjId, date: today }),  // Total records
       Screenshot.countDocuments({ tenantId: tenantObjId, timestamp: { $gte: new Date(today) } }),
-      User.countDocuments({ tenantId: tenantObjId, isOnline: true }),
+      User.countDocuments({ tenantId: tenantObjId, isOnline: true, role: 'employee' }),
       Screenshot.find({ tenantId: tenantObjId })
         .populate('userId', 'name email avatar')
         .sort({ timestamp: -1 })
@@ -191,10 +191,17 @@ const getEmployeeDashboard = async (req: AuthRequest, res: Response, next: NextF
       },
     ]);
 
+    const attendanceObj = todayAttendance ? todayAttendance.toObject() : null;
+    if (attendanceObj && attendanceObj.punchIn && !attendanceObj.punchOut) {
+      const elapsed = calculateWorkMinutes(attendanceObj.punchIn.time, new Date());
+      const idleTime = attendanceObj.idleMinutes || 0;
+      attendanceObj.totalWorkMinutes = Math.max(0, elapsed - attendanceObj.totalBreakMinutes - idleTime);
+    }
+
     res.json({
       success: true,
       data: {
-        todayAttendance,
+        todayAttendance: attendanceObj,
         todayScreenshots,
         recentActivity,
         weekAttendance,

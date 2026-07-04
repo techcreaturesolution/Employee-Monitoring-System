@@ -159,7 +159,7 @@ export const getLiveLocations = async (req: AuthRequest, res: Response): Promise
     const tenantId = req.user?.tenantId;
 
     const employees = await User.find(
-      { tenantId, status: 'active', isOnline: true },
+      { tenantId, status: 'active', isOnline: true, role: 'employee' },
       'name email department workMode lastKnownLocation isOnline lastActive'
     );
 
@@ -239,3 +239,22 @@ export const getLocationTrail = async (req: AuthRequest, res: Response): Promise
     res.status(500).json({ success: false, message: 'Failed to get location trail.', error: (error as Error).message });
   }
 };
+
+export const getMyCurrentLocation = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?._id;
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ success: false, message: 'User not found.' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: user.lastKnownLocation || { latitude: 0, longitude: 0, address: '', updatedAt: null },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to get current location.', error: (error as Error).message });
+  }
+};
+

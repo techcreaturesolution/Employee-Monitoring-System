@@ -62,9 +62,17 @@ export const updateProject = async (req: AuthRequest, res: Response): Promise<vo
     const { id } = req.params;
     const tenantId = req.user?.tenantId;
 
+    const allowedUpdates = ['name', 'description', 'members', 'status'];
+    const updates: Record<string, any> = {};
+    for (const key of allowedUpdates) {
+      if (req.body[key] !== undefined) {
+        updates[key] = req.body[key];
+      }
+    }
+
     const project = await Project.findOneAndUpdate(
       { _id: id, tenantId },
-      req.body,
+      updates,
       { new: true }
     );
 
