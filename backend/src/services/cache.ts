@@ -5,8 +5,22 @@ import { logger } from '../utils/logger';
 let isRedisAvailable = false;
 let hasLoggedDisconnect = false;
 
+let redisUrl = process.env.REDIS_URL;
+
+if (!redisUrl) {
+  const host = process.env.REDIS_HOST || 'localhost';
+  const port = process.env.REDIS_PORT || '6379';
+  const password = process.env.REDIS_PASSWORD ? `:${process.env.REDIS_PASSWORD}@` : '';
+  
+  if (host.startsWith('redis://') || host.startsWith('rediss://')) {
+    redisUrl = host;
+  } else {
+    redisUrl = `redis://${password}${host}:${port}`;
+  }
+}
+
 const redisClient = createClient({
-  url: `redis://${process.env.REDIS_PASSWORD ? `:${process.env.REDIS_PASSWORD}@` : ''}${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || '6379'}`,
+  url: redisUrl,
   socket: {
     // Back off exponentially, max 30s between retries - stop after 5 tries if never connected
     reconnectStrategy: (retries: number) => {
