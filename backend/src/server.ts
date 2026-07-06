@@ -38,6 +38,7 @@ const buildAllowedOrigins = () => {
     'http://localhost:3001',
     'http://localhost:3002',
     'http://localhost:5173',
+    'https://empsystem-tcs.netlify.app',
   ];
   // Support comma-separated additional origins from env (e.g. deployed frontend URL)
   if (process.env.ADDITIONAL_ALLOWED_ORIGINS) {
