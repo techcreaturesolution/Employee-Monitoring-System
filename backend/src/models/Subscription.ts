@@ -55,7 +55,6 @@ const subscriptionSchema = new Schema<ISubscription>(
   { timestamps: true }
 );
 
-subscriptionSchema.index({ tenantId: 1 });
 subscriptionSchema.index({ razorpaySubscriptionId: 1 });
 
 export const Subscription = mongoose.model<ISubscription>('Subscription', subscriptionSchema);

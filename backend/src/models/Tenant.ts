@@ -99,7 +99,6 @@ const tenantSchema = new Schema<ITenant>(
   { timestamps: true }
 );
 
-tenantSchema.index({ email: 1 });
 tenantSchema.index({ status: 1 });
 
 export const Tenant = mongoose.model<ITenant>('Tenant', tenantSchema);

@@ -36,17 +36,15 @@ export const logger = winston.createLogger({
   ],
 });
 
-// Console transport in development
-if (config.nodeEnv !== 'production') {
-  logger.add(
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      ),
-    })
-  );
-}
+// Console transport in all environments
+logger.add(
+  new winston.transports.Console({
+    format: winston.format.combine(
+      winston.format.colorize(),
+      winston.format.simple()
+    ),
+  })
+);
 
 // Log uncaught exceptions and rejections
 process.on('uncaughtException', (error) => {
