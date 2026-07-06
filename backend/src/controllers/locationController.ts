@@ -3,7 +3,7 @@ import { LocationLog } from '../models/LocationLog';
 import { User } from '../models/User';
 import { Tenant } from '../models/Tenant';
 import { AuthRequest } from '../middleware/auth';
-import { isInsideGeofence, paginate } from '../utils/helpers';
+import { isInsideGeofence, getMatchedOffice, paginate } from '../utils/helpers';
 
 export const trackLocation = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -158,6 +158,10 @@ export const getLiveLocations = async (req: AuthRequest, res: Response): Promise
   try {
     const tenantId = req.user?.tenantId;
 
+    // Fetch tenant office locations once for geofence comparison
+    const tenant = await Tenant.findById(tenantId);
+    const officeLocations = tenant?.settings?.officeLocations || [];
+
     const employees = await User.find(
       { tenantId, status: 'active', isOnline: true, role: 'employee' },
       'name email department workMode lastKnownLocation isOnline lastActive'
@@ -165,16 +169,37 @@ export const getLiveLocations = async (req: AuthRequest, res: Response): Promise
 
     const liveData = employees
       .filter((e) => e.lastKnownLocation?.latitude && e.lastKnownLocation?.longitude)
-      .map((e) => ({
-        userId: e._id,
-        name: e.name,
-        email: e.email,
-        department: e.department,
-        workMode: e.workMode,
-        location: e.lastKnownLocation,
-        isOnline: e.isOnline,
-        lastActive: e.lastActive,
-      }));
+      .map((e) => {
+        const loc = e.lastKnownLocation!;
+        const matchedOffice = officeLocations.length > 0
+          ? getMatchedOffice(loc.latitude, loc.longitude, officeLocations)
+          : null;
+
+        // Derive a human-readable location status
+        let locationStatus: string;
+        if (matchedOffice) {
+          locationStatus = `At Office – ${matchedOffice.name}`;
+        } else if (e.workMode === 'wfh') {
+          locationStatus = 'Work From Home';
+        } else if (e.workMode === 'field') {
+          locationStatus = 'Field Work';
+        } else {
+          locationStatus = loc.address ? `Remote – ${loc.address}` : 'Remote Location';
+        }
+
+        return {
+          userId: e._id,
+          name: e.name,
+          email: e.email,
+          department: e.department,
+          workMode: e.workMode,
+          location: loc,
+          isOnline: e.isOnline,
+          lastActive: e.lastActive,
+          matchedOffice,         // { name, distanceMeters } | null
+          locationStatus,        // human-readable label
+        };
+      });
 
     res.json({ success: true, data: liveData });
   } catch (error) {

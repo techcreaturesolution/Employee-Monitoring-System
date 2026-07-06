@@ -166,7 +166,12 @@ export interface LiveEmployeeLocation {
   };
   isOnline: boolean;
   lastActive: string;
+  /** Populated by backend when the employee is inside a configured office geofence */
+  matchedOffice?: { name: string; distanceMeters: number } | null;
+  /** Human-readable location label: e.g. "At Office – HQ", "Work From Home", "Remote – Gandhinagar" */
+  locationStatus?: string;
 }
+
 
 export interface ApiResponse<T> {
   success: boolean;

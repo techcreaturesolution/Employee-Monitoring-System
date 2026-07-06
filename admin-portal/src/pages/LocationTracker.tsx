@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { locationAPI, employeeAPI } from '../services/api';
 import { LiveEmployeeLocation, LocationLog as LocationLogType, User } from '../types';
-import { MapPin, Navigation, RefreshCw, Wifi, WifiOff, Home, Building2, Briefcase, Clock } from 'lucide-react';
+import { MapPin, Navigation, RefreshCw, Wifi, WifiOff, Home, Building2, Briefcase, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 const workModeConfig = {
@@ -83,6 +83,25 @@ const LocationTracker: React.FC = () => {
     const hours = Math.floor(mins / 60);
     if (hours < 24) return `${hours}h ago`;
     return `${Math.floor(hours / 24)}d ago`;
+  };
+
+  /**
+   * Returns badge style + icon component based on the locationStatus string
+   * produced by the backend geofence comparison.
+   */
+  const getLocationBadge = (emp: LiveEmployeeLocation) => {
+    const status = emp.locationStatus || '';
+    if (status.startsWith('At Office')) {
+      return { color: 'bg-green-100 text-green-700 border-green-200', Icon: CheckCircle2, label: status };
+    }
+    if (status === 'Work From Home') {
+      return { color: 'bg-blue-100 text-blue-700 border-blue-200', Icon: Home, label: status };
+    }
+    if (status === 'Field Work') {
+      return { color: 'bg-orange-100 text-orange-700 border-orange-200', Icon: Briefcase, label: status };
+    }
+    // Remote / unknown
+    return { color: 'bg-slate-100 text-slate-600 border-slate-200', Icon: XCircle, label: status || emp.location?.address || 'Remote Location' };
   };
 
   if (loading) {
@@ -211,12 +230,31 @@ const LocationTracker: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-red-500" />
-                            <span className="text-sm text-slate-600">
-                              {emp.location?.address || 'GPS location recorded'}
-                            </span>
-                          </div>
+                          {/* Location status badge */}
+                          {(() => {
+                            const { color, Icon, label } = getLocationBadge(emp);
+                            return (
+                              <div className="space-y-1">
+                                <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border font-medium ${color}`}>
+                                  <Icon className="w-3 h-3" />
+                                  {label}
+                                </span>
+                                {/* Show distance from office when inside geofence */}
+                                {emp.matchedOffice && (
+                                  <p className="text-xs text-slate-400">
+                                    {emp.matchedOffice.distanceMeters}m from office centre
+                                  </p>
+                                )}
+                                {/* Raw address as secondary info */}
+                                {emp.location?.address && !emp.locationStatus?.startsWith('At Office') && (
+                                  <p className="text-xs text-slate-400 truncate max-w-[180px]" title={emp.location.address}>
+                                    <MapPin className="inline w-3 h-3 mr-0.5" />
+                                    {emp.location.address}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3">
                           <a

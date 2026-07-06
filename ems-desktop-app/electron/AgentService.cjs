@@ -267,34 +267,72 @@ class AgentService {
     }
   }
 
+  /**
+   * Reverse-geocode lat/lng via Nominatim (OpenStreetMap) to get an accurate
+   * city name. IP geolocation APIs often return the ISP-registered metro city
+   * (e.g. "Ahmedabad") instead of the actual city (e.g. "Gandhinagar").
+   * Nominatim resolves by actual coordinates, giving the correct district/city.
+   */
+  async reverseGeocodeNominatim(latitude, longitude) {
+    try {
+      const res = await axios.get(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+        {
+          timeout: 5000,
+          headers: { 'User-Agent': 'EMS-DesktopAgent/1.0' }
+        }
+      );
+      if (res.data && res.data.address) {
+        const a = res.data.address;
+        // Prefer the most specific city-level field available
+        const city =
+          a.city ||
+          a.town ||
+          a.village ||
+          a.county ||
+          a.state_district ||
+          a.state ||
+          '';
+        const parts = [city, a.state, a.country].filter(Boolean);
+        return parts.join(', ') || res.data.display_name || '';
+      }
+    } catch (e) {
+      console.warn('[Agent] Nominatim reverse-geocode failed:', e.message);
+    }
+    return null;
+  }
+
   async fetchIPLocation() {
+    let coords = null;
+
+    // Step 1: Get coordinates from IP geolocation
     try {
       const res = await axios.get('https://freeipapi.com/api/json', { timeout: 5000 });
       if (res.data && res.data.latitude && res.data.longitude) {
-        const address = [res.data.cityName, res.data.regionName, res.data.countryName].filter(Boolean).join(', ');
-        return {
-          latitude: res.data.latitude,
-          longitude: res.data.longitude,
-          address: address || 'IP Location'
-        };
+        coords = { latitude: res.data.latitude, longitude: res.data.longitude };
       }
     } catch (err) {
       console.warn('[Agent] freeipapi.com failed, trying ip-api.com...');
       try {
         const res = await axios.get('http://ip-api.com/json/', { timeout: 5000 });
         if (res.data && res.data.status === 'success') {
-          const address = [res.data.city, res.data.regionName, res.data.country].filter(Boolean).join(', ');
-          return {
-            latitude: res.data.lat,
-            longitude: res.data.lon,
-            address: address || 'IP Location'
-          };
+          coords = { latitude: res.data.lat, longitude: res.data.lon };
         }
       } catch (err2) {
         console.error('[Agent] All IP location services failed:', err2.message);
       }
     }
-    return null;
+
+    if (!coords) return null;
+
+    // Step 2: Reverse-geocode coordinates → accurate city name (e.g. Gandhinagar, not Ahmedabad)
+    const accurateAddress = await this.reverseGeocodeNominatim(coords.latitude, coords.longitude);
+
+    return {
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      address: accurateAddress || 'IP Location'
+    };
   }
 
   async trackLocation() {

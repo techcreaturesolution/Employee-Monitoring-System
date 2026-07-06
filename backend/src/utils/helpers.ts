@@ -77,3 +77,21 @@ export const isInsideGeofence = (
   }
   return false;
 };
+
+/**
+ * Returns the matched office (name + distance in metres) if the coordinates
+ * fall inside any configured geofence, otherwise null.
+ */
+export const getMatchedOffice = (
+  lat: number,
+  lon: number,
+  officeLocations: Array<{ name: string; latitude: number; longitude: number; radiusMeters: number }>
+): { name: string; distanceMeters: number } | null => {
+  for (const office of officeLocations) {
+    const distance = haversineDistance(lat, lon, office.latitude, office.longitude);
+    if (distance <= office.radiusMeters) {
+      return { name: office.name, distanceMeters: Math.round(distance) };
+    }
+  }
+  return null;
+};
