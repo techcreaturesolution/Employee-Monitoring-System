@@ -1,9 +1,36 @@
 const { app, BrowserWindow, Menu, Tray, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 let mainWindow;
 let tray = null;
 let isQuitting = false;
+let agentService = null; // initialised inside app.on('ready') after Electron is ready
+
+// ── Crash safety net ─────────────────────────────────────────────────────────
+// Writes unhandled exceptions to a log file on disk so startup crashes are
+// never silently swallowed when the app is launched from Explorer / taskbar.
+const logFile = path.join(
+  process.env.APPDATA || process.env.HOME || '.',
+  'EMS-Agent',
+  'crash.log'
+);
+try { fs.mkdirSync(path.dirname(logFile), { recursive: true }); } catch (_) {}
+
+process.on('uncaughtException', (err) => {
+  const msg = `[${new Date().toISOString()}] UNCAUGHT EXCEPTION\n${err.stack || err}\n\n`;
+  try { fs.appendFileSync(logFile, msg); } catch (_) {}
+  console.error(msg);
+  // Allow Electron to do its own cleanup before exit
+  setTimeout(() => process.exit(1), 200);
+});
+
+process.on('unhandledRejection', (reason) => {
+  const msg = `[${new Date().toISOString()}] UNHANDLED REJECTION\n${reason?.stack || reason}\n\n`;
+  try { fs.appendFileSync(logFile, msg); } catch (_) {}
+  console.error(msg);
+});
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Enforce single-instance lock
 const gotTheLock = app.requestSingleInstanceLock();
@@ -31,6 +58,17 @@ if (!gotTheLock) {
     } catch (e) {
       console.error('Failed to cleanup old records:', e);
     }
+
+    // Require and initialise AgentService HERE, after the ready event.
+    // AgentService touches powerMonitor and app.getPath() inside init(),
+    // both of which throw if called before ready.
+    try {
+      agentService = require('./AgentService.cjs');
+      agentService.init();
+    } catch (e) {
+      console.error('Failed to initialise AgentService:', e);
+    }
+
     createWindow();
   });
 
@@ -139,7 +177,7 @@ function createTray() {
   }
 }
 
-const agentService = require('./AgentService.cjs');
+
 
 function setupIpcListeners() {
   // Window controls

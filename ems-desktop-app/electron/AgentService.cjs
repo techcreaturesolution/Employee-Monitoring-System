@@ -1,5 +1,5 @@
 const { queueActivity, getUnsyncedActivities, markAsSynced, getApiUrl, queueScreenshot, getUnuploadedScreenshots, markScreenshotAsUploaded, getToken, getAgentKey } = require('./storage.cjs');
-const { app, powerMonitor } = require('electron');
+const { app } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
@@ -20,27 +20,40 @@ class AgentService {
     this.heartbeatTimer = null;
     this.idleTimer = null;
     this.locationTimer = null;
-    
-    this.tempDir = path.join(app.getPath('temp'), 'ems-agent');
-    this.offlineScreenshotsDir = path.join(app.getPath('userData'), 'offline-screenshots');
-    
-    if (!fs.existsSync(this.tempDir)) fs.mkdirSync(this.tempDir, { recursive: true });
-    if (!fs.existsSync(this.offlineScreenshotsDir)) fs.mkdirSync(this.offlineScreenshotsDir, { recursive: true });
-    
+
+    // Paths are resolved in init() after app is ready
+    this.tempDir = null;
+    this.offlineScreenshotsDir = null;
+
     this.apiBaseUrl = getApiUrl();
     this.token = getToken() || null;
     this.agentKey = getAgentKey() || null;
-    
+
     this.accumulatedIdleSeconds = 0;
     this.isUserIdle = false;
     this.isOnBreak = false;
-    
+
     // Memory buffer for activities to avoid constant SQLite writes
     this.activityBuffer = [];
     this.lastActivityLog = null;
     this.activityStartTime = new Date();
+  }
 
-    // Register Power Monitor events for Sleep / Hibernate / Lock
+  /**
+   * Must be called once from app.on('ready', ...) in main.cjs.
+   * Anything that touches powerMonitor, app.getPath(), or BrowserWindow
+   * must live here — Electron forbids those APIs before the ready event.
+   */
+  init() {
+    // Resolve app paths (only valid after ready)
+    this.tempDir = path.join(app.getPath('temp'), 'ems-agent');
+    this.offlineScreenshotsDir = path.join(app.getPath('userData'), 'offline-screenshots');
+
+    if (!fs.existsSync(this.tempDir)) fs.mkdirSync(this.tempDir, { recursive: true });
+    if (!fs.existsSync(this.offlineScreenshotsDir)) fs.mkdirSync(this.offlineScreenshotsDir, { recursive: true });
+
+    // powerMonitor is only accessible after app is ready
+    const { powerMonitor } = require('electron');
     powerMonitor.on('suspend', () => {
       console.log('System suspending, pausing tracking...');
       this.stop();

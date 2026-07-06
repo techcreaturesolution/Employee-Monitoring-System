@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -138,8 +138,12 @@ const VERSION = 'v1.2.0';
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const pad = (n: number) => String(Math.floor(n)).padStart(2, '0');
 
-const formatTimer = (sec: number) =>
-  `${pad(sec / 3600)}:${pad((sec % 3600) / 60)}:${pad(sec % 60)}`;
+const formatTimer = (sec: number) => {
+  // Always clamp to 0 — clock drift between employee PC and server can
+  // produce a negative value without this guard.
+  const s = Math.max(0, Math.floor(sec));
+  return `${pad(s / 3600)}:${pad((s % 3600) / 60)}:${pad(s % 60)}`;
+};
 
 const formatHM = (sec: number) => {
   const h = Math.floor(sec / 3600);
@@ -150,45 +154,54 @@ const formatHM = (sec: number) => {
 
 const eAPI = () => (window as any).electronAPI;
 
-// ─── Optimized Timer-related Components ─────────────────────────────────────
-function TimerDisplay({ punchInTime, active }: { punchInTime: Date | null; active: boolean }) {
-  const [sec, setSec] = useState(() => punchInTime ? Math.floor((Date.now() - punchInTime.getTime()) / 1000) : 0);
+// ─── Timer-related Components ────────────────────────────────────────────────
+// These components receive `baseElapsedSec` — the server-computed seconds already
+// worked — and tick forward using ONLY the local clock as a stopwatch delta.
+// This means we NEVER subtract the employee's clock against the server's clock,
+// so clock drift cannot produce negative values.
+
+function TimerDisplay({ baseElapsedSec, active }: { baseElapsedSec: number; active: boolean }) {
+  const [sec, setSec] = useState(baseElapsedSec);
   useEffect(() => {
-    if (!active || !punchInTime) return;
-    setSec(Math.floor((Date.now() - punchInTime.getTime()) / 1000));
+    setSec(baseElapsedSec);
+    if (!active) return;
+    const mountedAt = Date.now(); // reference point on THIS machine only
     const interval = setInterval(() => {
-      setSec(Math.floor((Date.now() - punchInTime.getTime()) / 1000));
+      setSec(baseElapsedSec + Math.floor((Date.now() - mountedAt) / 1000));
     }, 1000);
     return () => clearInterval(interval);
-  }, [active, punchInTime]);
-  return <>{formatTimer(sec)}</>;
+  }, [active, baseElapsedSec]);
+  return <>{formatTimer(Math.max(0, sec))}</>;
 }
 
-function HMDisplay({ punchInTime, active, updateInterval = 5000 }: { punchInTime: Date | null; active: boolean; updateInterval?: number }) {
-  const [sec, setSec] = useState(() => punchInTime ? Math.floor((Date.now() - punchInTime.getTime()) / 1000) : 0);
+function HMDisplay({ baseElapsedSec, active, updateInterval = 5000 }: { baseElapsedSec: number; active: boolean; updateInterval?: number }) {
+  const [sec, setSec] = useState(baseElapsedSec);
   useEffect(() => {
-    if (!active || !punchInTime) return;
-    setSec(Math.floor((Date.now() - punchInTime.getTime()) / 1000));
+    setSec(baseElapsedSec);
+    if (!active) return;
+    const mountedAt = Date.now();
     const interval = setInterval(() => {
-      setSec(Math.floor((Date.now() - punchInTime.getTime()) / 1000));
+      setSec(baseElapsedSec + Math.floor((Date.now() - mountedAt) / 1000));
     }, updateInterval);
     return () => clearInterval(interval);
-  }, [active, punchInTime, updateInterval]);
-  return <>{formatHM(sec)}</>;
+  }, [active, baseElapsedSec, updateInterval]);
+  return <>{formatHM(Math.max(0, sec))}</>;
 }
 
-function ProgressBar({ punchInTime, active }: { punchInTime: Date | null; active: boolean }) {
-  const [sec, setSec] = useState(() => punchInTime ? Math.floor((Date.now() - punchInTime.getTime()) / 1000) : 0);
+function ProgressBar({ baseElapsedSec, active }: { baseElapsedSec: number; active: boolean }) {
+  const [sec, setSec] = useState(baseElapsedSec);
   useEffect(() => {
-    if (!active || !punchInTime) return;
-    setSec(Math.floor((Date.now() - punchInTime.getTime()) / 1000));
+    setSec(baseElapsedSec);
+    if (!active) return;
+    const mountedAt = Date.now();
     const interval = setInterval(() => {
-      setSec(Math.floor((Date.now() - punchInTime.getTime()) / 1000));
+      setSec(baseElapsedSec + Math.floor((Date.now() - mountedAt) / 1000));
     }, 1000);
     return () => clearInterval(interval);
-  }, [active, punchInTime]);
-  const pct = Math.min((sec / (WORK_HOURS * 3600)) * 100, 100);
-  const overtime = sec > WORK_HOURS * 3600;
+  }, [active, baseElapsedSec]);
+  const clamped = Math.max(0, sec);
+  const pct = Math.min((clamped / (WORK_HOURS * 3600)) * 100, 100);
+  const overtime = clamped > WORK_HOURS * 3600;
   return (
     <div className="h-1.5 bg-[#21262d] rounded-full mb-1 overflow-hidden">
       <div className={`h-full rounded-full ${overtime ? 'bg-amber-400' : 'bg-blue-500'}`} style={{ width: `${pct}%` }} />
@@ -258,10 +271,10 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [viewMode, setViewMode] = useState<1 | 2 | 3>(1);
 
   const [punchStatus, setPunchStatus] = useState<'in' | 'out'>('out');
-  const [punchInTime, setPunchInTime] = useState<Date | null>(null);
+  // baseElapsedSec: server-computed seconds already worked today.
+  // Timer components tick forward from this using a local stopwatch.
+  const [baseElapsedSec, setBaseElapsedSec] = useState(0);
   const [totalSec, setTotalSec] = useState(0);
-
-  const elapsedSec = punchInTime ? Math.floor((Date.now() - punchInTime.getTime()) / 1000) : 0;
 
   // Base productivity values
   const [prodSec, setProdSec] = useState(0);
@@ -286,6 +299,8 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [isOnBreak, setIsOnBreak] = useState(false);
   const [todayBreaks, setTodayBreaks] = useState<any[]>([]);
   const [totalBreakSec, setTotalBreakSec] = useState(0);
+  // Human-readable punch-in time string shown in the UI
+  const [punchInStr, setPunchInStr] = useState<string | null>(null);
 
 
 
@@ -329,6 +344,11 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
     if (res.status === 401) {
       handleLogout();
       throw new Error('Unauthorized');
+    }
+    if (res.status === 429) {
+      // Rate-limited — throw silently so the caller's catch block
+      // swallows the error and we do NOT retry until the next cycle.
+      throw new Error('RateLimited');
     }
     return res;
   };
@@ -403,9 +423,12 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
             else if (item._id === 'neutral') nSec = sec;
             else if (item._id === 'unproductive') uSec = sec;
           });
-          setProdSec(pSec);
-          setNeutSec(nSec);
-          setUnprodSec(uSec);
+          // Use Math.max so the server acts as a floor, not an overwrite.
+          // Without this, the 30 s server sync resets numbers that the local
+          // 5 s poll has already counted forward — causing the bar to jump back.
+          setProdSec(p => Math.max(p, pSec));
+          setNeutSec(n => Math.max(n, nSec));
+          setUnprodSec(u => Math.max(u, uSec));
         }
       }
     } catch {
@@ -431,13 +454,19 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
         }
 
         if (data.data.isPunchedIn) {
-          const pit = new Date(data.data.punchInTime);
+          // Use totalWorkMinutes from the server as the elapsed base.
+          // This avoids comparing employee PC clock vs server clock.
+          setBaseElapsedSec((data.data.totalWorkMinutes || 0) * 60);
           setPunchStatus('in');
-          setPunchInTime(pit);
+          // Store human-readable punch-in time for display only
+          if (data.data.punchInTime) {
+            setPunchInStr(new Date(data.data.punchInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+          }
           if (eAPI()) eAPI().setTracking(true);
         } else {
+          setBaseElapsedSec(0);
           setPunchStatus('out');
-          setPunchInTime(null);
+          setPunchInStr(null);
           if (eAPI()) eAPI().setTracking(false);
         }
       }
@@ -463,8 +492,12 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
     setLoading(false);
   };
 
-  // Fetch status on mount
+  // Fetch status on mount — guarded so React StrictMode's double-invoke
+  // in development does not fire two simultaneous refreshAll() bursts.
+  const didMount = useRef(false);
   useEffect(() => {
+    if (didMount.current) return;
+    didMount.current = true;
     refreshAll();
 
     const api = eAPI();
@@ -569,6 +602,9 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   }, []);
 
   // Poll unsynced count & server status
+  // Health endpoint hits rate limits quickly on the free Render tier.
+  // Use navigator.onLine as the instant signal; only hit /api/health
+  // every 3 minutes as a confirmation.
   useEffect(() => {
     const checkStatus = async () => {
       const api = eAPI();
@@ -578,26 +614,34 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
           setUnsyncedCount(cnt);
         } catch { }
       }
+      // Fast path: browser reports offline immediately via navigator.onLine
+      if (!navigator.onLine) {
+        setServerConnected(false);
+        return;
+      }
+      // Slow path: confirm with a real HTTP call every 3 minutes
       try {
-        const res = await fetch(`${API_URL.replace('/api', '')}/api/health`);
+        const res = await fetch(`${API_URL.replace('/api', '')}/api/health`, { signal: AbortSignal.timeout(5000) });
         setServerConnected(res.ok);
       } catch {
         setServerConnected(false);
       }
     };
     checkStatus();
-    const id = setInterval(checkStatus, 20000);
+    const id = setInterval(checkStatus, 3 * 60 * 1000); // 3 minutes
     return () => clearInterval(id);
   }, []);
 
-  // Periodic background refresh for dynamic content to prevent rate limit hits
+  // Periodic background refresh — staggered so tasks / projects / topApps
+  // don't all fire simultaneously. 5-minute interval keeps well under
+  // the Render free-tier rate limit.
   useEffect(() => {
-    const refreshData = () => {
+    const id = setInterval(() => {
       fetchTasks();
-      fetchProjects();
-      fetchTopApps();
-    };
-    const id = setInterval(refreshData, 30000);
+      // Stagger projects & topApps 8 s apart to avoid a request burst
+      setTimeout(() => fetchProjects(), 8000);
+      setTimeout(() => fetchTopApps(), 16000);
+    }, 5 * 60 * 1000); // 5 minutes
     return () => clearInterval(id);
   }, []);
 
@@ -611,8 +655,9 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
       const data = await res.json();
       if (data.success) {
         if (type === 'in') {
-          const now = new Date();
-          setPunchStatus('in'); setPunchInTime(now);
+          setBaseElapsedSec(0);
+          setPunchStatus('in');
+          setPunchInStr(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
           setProdSec(0); setNeutSec(0); setUnprodSec(0);
           if (eAPI()) eAPI().setTracking(true);
           new Notification("EMS Monitor", { body: "Punch In successful. Tracking started." });
@@ -621,8 +666,10 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
             ...prev.slice(0, 19)
           ]);
         } else {
-          setTotalSec(elapsedSec);
-          setPunchStatus('out'); setPunchInTime(null); setActivity(null);
+          setTotalSec(baseElapsedSec);
+          setBaseElapsedSec(0);
+          setPunchStatus('out'); setActivity(null);
+          setPunchInStr(null);
           setIsOnBreak(false);
           if (eAPI()) {
             eAPI().setTracking(false);
@@ -725,10 +772,8 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   const filteredTasks = tasks.filter(t =>
     taskFilter === 'All' ? true : taskFilter === 'Done' ? t.done : !t.done);
 
-  const overtime = elapsedSec > WORK_HOURS * 3600;
-  const inAtStr = punchInTime
-    ? punchInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : null;
+  const overtime = baseElapsedSec > WORK_HOURS * 3600;
+  const inAtStr = punchInStr;
 
   // Productivity percentages
   const totalProdSec = prodSec + neutSec + unprodSec;
@@ -821,17 +866,17 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                     <>
                       <div className="text-center mb-3">
                         <div className={`text-4xl font-mono font-bold tracking-tight leading-none ${overtime ? 'text-amber-400' : 'text-white'}`}>
-                          <TimerDisplay punchInTime={punchInTime} active={punchStatus === 'in'} />
+                          <TimerDisplay baseElapsedSec={baseElapsedSec} active={punchStatus === 'in'} />
                         </div>
                         <div className="text-[11px] text-slate-500 mt-1.5 flex justify-between">
                           <span>Goal: {WORK_HOURS} hrs{inAtStr && <span> • In at {inAtStr}</span>}</span>
                           <span className="font-semibold text-amber-500">Break: {formatHM(totalBreakSec)}</span>
                         </div>
                       </div>
-                      <ProgressBar punchInTime={punchInTime} active={punchStatus === 'in'} />
+                      <ProgressBar baseElapsedSec={baseElapsedSec} active={punchStatus === 'in'} />
                       <div className="flex justify-between text-[10px] text-slate-600 mb-3.5">
                         <span>0 hr</span>
-                        <span><HMDisplay punchInTime={punchInTime} active={punchStatus === 'in'} /> / {WORK_HOURS} hr</span>
+                        <span><HMDisplay baseElapsedSec={baseElapsedSec} active={punchStatus === 'in'} /> / {WORK_HOURS} hr</span>
                         <span>{WORK_HOURS} hr</span>
                       </div>
                       <button onClick={() => handlePunch('out')} className="w-full py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
@@ -871,46 +916,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
               </section>
 
-              {/* Productivity */}
-              <section className="bg-[#161b22] border border-[#21262d] rounded-xl overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-[#21262d]">
-                  <span className="text-blue-400">{Icon.layout}</span>
-                  <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-widest">Productivity</span>
-                </div>
-                <div className="px-4 py-4">
-                  <div className="flex h-3 w-full rounded-full overflow-hidden bg-[#21262d] mb-4">
-                    <div style={{ width: `${prodPct}%` }} className="bg-green-500" />
-                    <div style={{ width: `${neutPct}%` }} className="bg-gray-400" />
-                    <div style={{ width: `${unprodPct}%` }} className="bg-red-500" />
-                  </div>
-                  <div className="grid grid-cols-3 gap-1 text-center">
-                    <div>
-                      <div className="flex items-center justify-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                        <span className="font-semibold text-green-400 text-xs">{prodPct}%</span>
-                      </div>
-                      <p className="text-[9px] text-slate-500 uppercase mt-0.5 leading-none">Productive</p>
-                      <p className="text-[10px] text-slate-400 font-semibold mt-1">{formatHM(prodSec)}</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                        <span className="font-semibold text-slate-300 text-xs">{neutPct}%</span>
-                      </div>
-                      <p className="text-[9px] text-slate-500 uppercase mt-0.5 leading-none">Neutral</p>
-                      <p className="text-[10px] text-slate-400 font-semibold mt-1">{formatHM(neutSec)}</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                        <span className="font-semibold text-red-400 text-xs">{unprodPct}%</span>
-                      </div>
-                      <p className="text-[9px] text-slate-500 uppercase mt-0.5 leading-none">Unproductive</p>
-                      <p className="text-[10px] text-slate-400 font-semibold mt-1">{formatHM(unprodSec)}</p>
-                    </div>
-                  </div>
-                </div>
-              </section>
+
             </div>
 
             <div className="space-y-3">
@@ -977,7 +983,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                 <div>
                   <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Attendance Timer</p>
                   <h2 className="text-xl font-mono font-bold text-white mt-1">
-                    {punchStatus === 'in' ? <TimerDisplay punchInTime={punchInTime} active={punchStatus === 'in'} /> : '00:00:00'}
+                    {punchStatus === 'in' ? <TimerDisplay baseElapsedSec={baseElapsedSec} active={punchStatus === 'in'} /> : '00:00:00'}
                   </h2>
                   <p className="text-[10px] text-slate-400 mt-0.5 flex justify-between">
                     <span>Goal: 8h 00m</span>
@@ -1053,7 +1059,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 </div>
                 <div className="mt-3.5 border-t border-[#21262d] pt-2 text-center">
-                  <span className="text-[10px] text-slate-500 font-medium">Total Time: <HMDisplay punchInTime={punchInTime} active={punchStatus === 'in'} /></span>
+                  <span className="text-[10px] text-slate-500 font-medium">Total Time: <HMDisplay baseElapsedSec={baseElapsedSec} active={punchStatus === 'in'} /></span>
                 </div>
               </div>
             </div>

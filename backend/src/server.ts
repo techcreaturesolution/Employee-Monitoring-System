@@ -92,7 +92,7 @@ app.use(compression()); // Gzip compress responses
 // ============ RATE LIMITERS ============
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Only 5 attempts
+  max: 30, // Increased to 30 attempts to avoid blocking users
   skipSuccessfulRequests: true, // Don't count successful logins
   message: {
     success: false,
@@ -111,20 +111,20 @@ const authLimiter = rateLimit({
 
 const refreshLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30, // higher - machine call, not login
+  max: 100, // Higher limit for token refreshes
   skipSuccessfulRequests: true,
   message: { success: false, message: 'Too many refresh attempts.' },
 });
 
 const screenshotLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 10, // 10 screenshots per minute
+  max: 30, // 30 screenshots per minute
   skipSuccessfulRequests: false,
 });
 
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: process.env.NODE_ENV === 'production' ? 300 : 10000,
+  max: 5000, // Raised to 5,000 to accommodate multi-agent background sync & admin portal live feeds
   message: 'Too many requests. Please try again later.',
 });
 
