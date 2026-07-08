@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
-import { Tenant } from '../models/Tenant';
-import { ProductivityKeyword } from '../models/ProductivityKeyword';
+import { Tenant } from '../modules/tenant/tenant.model';
+import { ProductivityKeyword } from '../modules/productivity/productivity.model';
 import { config } from '../config';
 
 // ============================================================

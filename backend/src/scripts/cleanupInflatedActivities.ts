@@ -23,7 +23,7 @@
 //                              Default: 480 (8 hours — a full shift).
 
 import mongoose from 'mongoose';
-import { ActivityLog } from '../models/ActivityLog';
+import { ActivityLog } from '../modules/activity/activity.model';
 import { config } from '../config';
 
 const args = process.argv.slice(2);

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { config } from '../config';
-import { User } from '../models/User';
-import { Tenant } from '../models/Tenant';
+import { User } from '../modules/employee/employee.model';
+import { Tenant } from '../modules/tenant/tenant.model';
 import { generateAgentKey } from '../utils/helpers';
 
 const seed = async () => {

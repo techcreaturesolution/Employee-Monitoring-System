@@ -10,7 +10,7 @@ const isCloudinaryConfigured = !!(
   config.cloudinary.apiSecret
 );
 
-if (isCloudinaryConfigured) {
+if (isCloudinaryConfigured && process.env.NODE_ENV !== 'test') {
   cloudinary.config({
     cloud_name: config.cloudinary.cloudName,
     api_key: config.cloudinary.apiKey,

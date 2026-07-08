@@ -1,0 +1,106 @@
+import mongoose, { Schema, Document } from 'mongoose';
+
+export interface IBreak {
+  startTime: Date;
+  endTime?: Date; // optional – not set until break ends
+  duration: number;
+  reason: string;
+}
+
+export interface IPunchRecord {
+  time: Date;
+  ip: string;
+  location: {
+    latitude: number;
+    longitude: number;
+    address: string;
+    accuracy: number;
+  };
+  screenshotUrl: string;
+  method: 'agent' | 'web' | 'manual' | 'mobile';
+  isInsideGeofence: boolean;
+}
+
+export interface IAttendance extends Document {
+  userId: mongoose.Types.ObjectId;
+  tenantId: mongoose.Types.ObjectId;
+  date: string;
+  workMode: 'office' | 'wfh' | 'field';
+  punchIn?: IPunchRecord;
+  punchOut?: IPunchRecord;
+  breaks: IBreak[];
+  totalWorkMinutes: number;
+  totalBreakMinutes: number;
+  overtimeMinutes: number;
+  idleMinutes: number;
+  status: 'present' | 'absent' | 'half-day' | 'late' | 'on-leave';
+  notes: string;
+  approvedBy: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const punchRecordSchema = new Schema<IPunchRecord>(
+  {
+    time: { type: Date, required: true },
+    ip: { type: String, default: '' },
+    location: {
+      latitude: { type: Number, default: 0 },
+      longitude: { type: Number, default: 0 },
+      address: { type: String, default: '' },
+      accuracy: { type: Number, default: 0 },
+    },
+    screenshotUrl: { type: String, default: '' },
+    method: {
+      type: String,
+      enum: ['agent', 'web', 'manual', 'mobile'],
+      default: 'web',
+    },
+    isInsideGeofence: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const breakSchema = new Schema<IBreak>(
+  {
+    startTime: { type: Date, required: true },
+    endTime: { type: Date },
+    duration: { type: Number, default: 0 },
+    reason: { type: String, default: '' },
+  },
+  { _id: false }
+);
+
+const attendanceSchema = new Schema<IAttendance>(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+    date: { type: String, required: true },
+    workMode: {
+      type: String,
+      enum: ['office', 'wfh', 'field'],
+      default: 'office',
+    },
+    punchIn: { type: punchRecordSchema },
+    punchOut: { type: punchRecordSchema },
+    breaks: [breakSchema],
+    totalWorkMinutes: { type: Number, default: 0 },
+    totalBreakMinutes: { type: Number, default: 0 },
+    overtimeMinutes: { type: Number, default: 0 },
+    idleMinutes: { type: Number, default: 0 },
+    status: {
+      type: String,
+      enum: ['present', 'absent', 'half-day', 'late', 'on-leave'],
+      default: 'present',
+    },
+    notes: { type: String, default: '' },
+    approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+  },
+  { timestamps: true }
+);
+
+attendanceSchema.index({ userId: 1, date: 1 }, { unique: true });
+attendanceSchema.index({ tenantId: 1, date: 1 });
+attendanceSchema.index({ tenantId: 1, userId: 1, date: -1 });
+
+export const Attendance = mongoose.model<IAttendance>('Attendance', attendanceSchema);

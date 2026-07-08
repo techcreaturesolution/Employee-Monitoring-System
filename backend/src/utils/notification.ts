@@ -1,4 +1,4 @@
-import { Notification } from '../models/Notification';
+import { Notification } from '../modules/notification/notification.model';
 import mongoose from 'mongoose';
 
 export interface ICreateNotificationInput {

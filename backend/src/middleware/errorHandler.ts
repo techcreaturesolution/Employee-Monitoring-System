@@ -16,8 +16,8 @@ export const errorHandler = (err: Error | AppError, _req: Request, res: Response
   let statusCode = 500;
   let message = 'Internal Server Error';
 
-  if (err instanceof AppError) {
-    statusCode = err.statusCode;
+  if (err instanceof AppError || (err as any).statusCode) {
+    statusCode = (err as any).statusCode;
     message = err.message;
   } else if (err.name === 'ValidationError') {
     statusCode = 400;

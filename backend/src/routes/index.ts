@@ -1,25 +1,28 @@
 import { Router } from 'express';
-import authRoutes from './authRoutes';
-import employeeRoutes from './employeeRoutes';
-import attendanceRoutes from './attendanceRoutes';
-import screenshotRoutes from './screenshotRoutes';
-import activityRoutes from './activityRoutes';
-import dashboardRoutes from './dashboardRoutes';
-import projectRoutes from './projectRoutes';
-import settingsRoutes from './settingsRoutes';
-import tenantRoutes from './tenantRoutes';
-import agentRoutes from './agentRoutes';
-import locationRoutes from './locationRoutes';
-import mobileRoutes from './mobileRoutes';
-import taskRoutes from './taskRoutes';
-import productivityRoutes from './productivityRoutes';
-import leaveRoutes from './leaveRoutes';
-import notificationRoutes from './notificationRoutes';
-import reportRoutes from './reportRoutes';
-import managerRoutes from './managerRoutes';
-import companyRoutes from './companyRoutes';
-import auditRoutes from './auditRoutes';
-import subscriptionRoutes from './subscriptionRoutes';
+
+// ── Import all module routers from src/modules/ ──────────────────────────────
+import authRoutes from '../modules/auth/auth.routes';
+import employeeRoutes from '../modules/employee/employee.routes';
+import attendanceRoutes from '../modules/attendance/attendance.routes';
+import screenshotRoutes from '../modules/screenshot/screenshot.routes';
+import activityRoutes from '../modules/activity/activity.routes';
+import dashboardRoutes from '../modules/dashboard';
+import projectRoutes from '../modules/project/project.routes';
+import settingsRoutes from '../modules/settings/settings.routes';
+import tenantRoutes from '../modules/tenant/tenant.routes';
+import agentRoutes from '../modules/agent/agent.routes';
+import locationRoutes from '../modules/location/location.routes';
+import mobileRoutes from '../modules/mobile/mobile.routes';
+import taskRoutes from '../modules/task/task.routes';
+import productivityRoutes from '../modules/productivity/productivity.routes';
+import leaveRoutes from '../modules/leave/leave.routes';
+import notificationRoutes from '../modules/notification/notification.routes';
+import reportRoutes from '../modules/report/report.routes';
+import managerRoutes from '../modules/manager/manager.routes';
+import companyRoutes from '../modules/company/company.routes';
+import auditRoutes from '../modules/audit/audit.routes';
+import subscriptionRoutes from '../modules/subscription/subscription.routes';
+import departmentRoutes from '../modules/department/department.routes';
 
 const router = Router();
 
@@ -44,5 +47,6 @@ router.use('/managers', managerRoutes);
 router.use('/company', companyRoutes);
 router.use('/audit-logs', auditRoutes);
 router.use('/subscriptions', subscriptionRoutes);
+router.use('/departments', departmentRoutes);
 
 export default router;

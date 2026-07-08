@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { config } from '../config';
-import { IUser } from '../models/User';
+import { IUser } from '../modules/employee/employee.model';
 
 export const generateAgentKey = (): string => {
   return `ems_${uuidv4().replace(/-/g, '')}`;

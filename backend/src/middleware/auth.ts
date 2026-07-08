@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
-import { User, IUser } from '../models/User';
+import { User, IUser } from '../modules/employee/employee.model';
 import { cache } from '../services/cache';
 
 export interface AuthRequest extends Request {

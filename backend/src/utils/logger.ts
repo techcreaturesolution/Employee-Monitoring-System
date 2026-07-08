@@ -1,9 +1,8 @@
 import winston from 'winston';
+import 'winston-daily-rotate-file';
 import path from 'path';
 import fs from 'fs';
-import { config } from '../config';
 
-// Ensure logs directory exists
 const logsDir = 'logs';
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir);
@@ -15,44 +14,42 @@ const logFormat = winston.format.combine(
   winston.format.json()
 );
 
+const errorRotateTransport = new winston.transports.DailyRotateFile({
+  filename: path.join(logsDir, 'error-%DATE%.log'),
+  datePattern: 'YYYY-MM-DD',
+  level: 'error',
+  maxSize: '5m',
+  maxFiles: '14d', // keep 14 days, then auto-delete
+  zippedArchive: true,
+});
+
+const combinedRotateTransport = new winston.transports.DailyRotateFile({
+  filename: path.join(logsDir, 'combined-%DATE%.log'),
+  datePattern: 'YYYY-MM-DD',
+  maxSize: '5m',
+  maxFiles: '14d',
+  zippedArchive: true,
+});
+
 export const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: logFormat,
   defaultMeta: { service: 'ems-api' },
-  transports: [
-    // Error logs
-    new winston.transports.File({
-      filename: path.join(logsDir, 'error.log'),
-      level: 'error',
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
-    }),
-    // All logs
-    new winston.transports.File({
-      filename: path.join(logsDir, 'combined.log'),
-      maxsize: 5242880,
-      maxFiles: 5,
-    }),
-  ],
+  transports: [errorRotateTransport, combinedRotateTransport],
 });
 
-// Console transport in all environments
 logger.add(
   new winston.transports.Console({
-    format: winston.format.combine(
-      winston.format.colorize(),
-      winston.format.simple()
-    ),
+    format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
   })
 );
 
-// Log uncaught exceptions and rejections
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
   process.exit(1);
 });
 
-process.on('unhandledRejection', (reason: Error) => {
+process.on('unhandledRejection', (reason: any) => {
   logger.error('Unhandled Rejection:', reason);
   process.exit(1);
 });

@@ -3,7 +3,7 @@ import { config } from './index';
 
 import fs from 'fs';
 import path from 'path';
-import { Screenshot } from '../models/Screenshot';
+import { Screenshot } from '../modules/screenshot/screenshot.model';
 
 const pruneBrokenScreenshots = async (): Promise<void> => {
   try {

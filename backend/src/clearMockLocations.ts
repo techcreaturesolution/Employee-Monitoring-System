@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'path';
-import { User } from './models/User';
-import { LocationLog } from './models/LocationLog';
+import { User } from './modules/employee/employee.model';
+import { LocationLog } from './modules/location/location.model';
 
 dotenv.config({ path: path.join(__dirname, '../.env') });
 

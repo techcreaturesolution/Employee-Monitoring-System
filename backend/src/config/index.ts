@@ -60,6 +60,17 @@ export const config = {
     email: process.env.SUPER_ADMIN_EMAIL!,
     password: process.env.SUPER_ADMIN_PASSWORD!,
   },
+  email: {
+    service: process.env.EMAIL_SERVICE || 'resend', // 'resend' | 'smtp'
+    from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    smtp: {
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      user: process.env.SMTP_USER || '',
+      pass: process.env.SMTP_PASS || '',
+    },
+  },
 } as const;
 
 export type Config = typeof config;
