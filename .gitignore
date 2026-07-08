@@ -37,3 +37,17 @@ coverage/
 # Temp
 .tmp/
 temp/
+
+# Archives & Installers
+*.zip
+*.tar.gz
+*.rar
+*.exe
+*.msi
+
+# Certificates & Signing Keys
+*.pfx
+*.pem
+*.key
+certs/
+
