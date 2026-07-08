@@ -2,6 +2,8 @@
   "name": "ems-desktop-app",
   "private": true,
   "version": "1.2.0",
+  "description": "EMS Agent - Employee Monitoring System Desktop Client",
+  "author": "Tech Creature Solutions",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -45,11 +47,18 @@
   "build": {
     "appId": "com.ems.agent",
     "productName": "EMSAgent",
-    "npmRebuild": false,
+    "npmRebuild": true,
     "asar": true,
     "asarUnpack": [
       "**/node_modules/screenshot-desktop/**/*",
-      "**/node_modules/active-win/**/*"
+      "**/node_modules/active-win/**/*",
+      "**/node_modules/sqlite3/**/*",
+      "**/node_modules/sharp/**/*",
+      "**/node_modules/@img/**/*",
+      "**/node_modules/node-addon-api/**/*",
+      "**/node_modules/@mapbox/**/*",
+      "**/node_modules/bindings/**/*",
+      "**/node_modules/file-uri-to-path/**/*"
     ],
     "directories": {
       "output": "dist-packaged"
@@ -60,11 +69,19 @@
       "package.json"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "requestedExecutionLevel": "highestAvailable",
+      "signtoolOptions": {
+        "signingHashAlgorithms": ["sha256"],
+        "rfc3161TimeStampServer": "http://timestamp.digicert.com"
+      }
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "EMS Agent"
     }
   }
 }

@@ -23,4 +23,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAutoStart:   () => ipcRenderer.invoke('get-autostart'),
   setTracking:    (start) => ipcRenderer.invoke('set-tracking', start),
   setBreak:       (isOnBreak) => ipcRenderer.invoke('set-break', isOnBreak),
+  updateLocation: (coords) => ipcRenderer.invoke('update-location', coords),
 });

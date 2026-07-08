@@ -12,11 +12,15 @@ import { logger } from '../utils/logger';
 const compileReportData = async (type: string, tenantId: any, startDate?: string, endDate?: string, userId?: string) => {
   switch (type) {
     case 'attendance': {
+      const todayStr = new Date().toISOString().split('T')[0];
       const match: Record<string, any> = { tenantId: new mongoose.Types.ObjectId(tenantId) };
       if (startDate || endDate) {
         match.date = {};
         if (startDate) match.date.$gte = startDate;
-        if (endDate) match.date.$lte = endDate;
+        const maxDate = endDate ? (endDate < todayStr ? (endDate as string) : todayStr) : todayStr;
+        match.date.$lte = maxDate;
+      } else {
+        match.date = { $lte: todayStr };
       }
       if (userId) match.userId = new mongoose.Types.ObjectId(userId);
 
@@ -357,3 +361,119 @@ export const exportPDF = async (req: AuthRequest, res: Response, next: NextFunct
     next(error);
   }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/reports/employee
+// Per-employee summary report: attendance + productivity + screenshots
+// ─────────────────────────────────────────────────────────────────────────────
+import { User } from '../models/User';
+export const getEmployeeReport = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const tenantId = req.user?.tenantId;
+    const { startDate, endDate, department } = req.query;
+    const tenantObjId = new mongoose.Types.ObjectId(String(tenantId));
+
+    const userFilter: Record<string, unknown> = { tenantId: tenantObjId, role: 'employee' };
+    if (department) userFilter.department = department;
+
+    const employees = await User.find(userFilter, 'name email department designation employeeId status');
+
+    const employeeIds = employees.map((e) => e._id);
+
+    const matchFilter: Record<string, unknown> = {
+      tenantId: tenantObjId,
+      userId: { $in: employeeIds },
+    };
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (startDate || endDate) {
+      matchFilter.date = {};
+      if (startDate) (matchFilter.date as any).$gte = startDate as string;
+      const maxDate = endDate ? (endDate < todayStr ? (endDate as string) : todayStr) : todayStr;
+      (matchFilter.date as any).$lte = maxDate;
+    } else {
+      matchFilter.date = { $lte: todayStr };
+    }
+
+    const attendanceSummary = await Attendance.aggregate([
+      { $match: matchFilter },
+      {
+        $group: {
+          _id: '$userId',
+          totalDays: { $sum: 1 },
+          presentDays: { $sum: { $cond: [{ $eq: ['$status', 'present'] }, 1, 0] } },
+          lateDays:    { $sum: { $cond: [{ $eq: ['$status', 'late']    }, 1, 0] } },
+          absentDays:  { $sum: { $cond: [{ $eq: ['$status', 'absent']  }, 1, 0] } },
+          totalWorkMinutes: { $sum: '$totalWorkMinutes' },
+        },
+      },
+    ]);
+
+    const attendanceMap = new Map(attendanceSummary.map((a) => [a._id.toString(), a]));
+
+    const report = employees.map((emp) => {
+      const att = attendanceMap.get(emp._id.toString()) || { totalDays: 0, presentDays: 0, lateDays: 0, absentDays: 0, totalWorkMinutes: 0 };
+      return {
+        employee: { id: emp._id, name: emp.name, email: emp.email, department: emp.department, designation: emp.designation, employeeId: emp.employeeId, status: emp.status },
+        attendance: att,
+      };
+    });
+
+    res.json({ success: true, data: report });
+  } catch (error) {
+    logger.error('getEmployeeReport failed:', error);
+    next(error);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/reports/project
+// ─────────────────────────────────────────────────────────────────────────────
+import { Project } from '../models/Project';
+export const getProjectReport = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const tenantId = req.user?.tenantId;
+    const tenantObjId = new mongoose.Types.ObjectId(String(tenantId));
+
+    const projects = await Project.find({ tenantId: tenantObjId })
+      .populate('createdBy', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, data: projects });
+  } catch (error) {
+    logger.error('getProjectReport failed:', error);
+    next(error);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/reports/task
+// ─────────────────────────────────────────────────────────────────────────────
+import { Task } from '../models/Task';
+export const getTaskReport = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const tenantId = req.user?.tenantId;
+    const tenantObjId = new mongoose.Types.ObjectId(String(tenantId));
+
+    const taskStats = await Task.aggregate([
+      { $match: { tenantId: tenantObjId } },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const tasks = await Task.find({ tenantId: tenantObjId })
+      .populate('userId', 'name email employeeId')
+      .populate('projectId', 'name')
+      .sort({ createdAt: -1 })
+      .limit(100);
+
+    res.json({ success: true, data: { taskStats, tasks } });
+  } catch (error) {
+    logger.error('getTaskReport failed:', error);
+    next(error);
+  }
+};
+

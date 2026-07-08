@@ -261,3 +261,173 @@ export {
   getScreenshot,
   deleteScreenshot,
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/screenshots/view/timeline
+// Returns screenshots grouped by hour for timeline display
+// ─────────────────────────────────────────────────────────────────────────────
+export const getScreenshotTimeline = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const tenantId = req.user?.tenantId;
+    const { userId, date } = req.query as Record<string, string>;
+
+    const targetDate = date ? new Date(date) : new Date();
+    const start = new Date(targetDate); start.setHours(0, 0, 0, 0);
+    const end   = new Date(targetDate); end.setHours(23, 59, 59, 999);
+
+    const filter: Record<string, unknown> = { tenantId, timestamp: { $gte: start, $lte: end } };
+    if (req.user?.role === 'employee') {
+      filter.userId = req.user._id;
+    } else if (userId) {
+      filter.userId = userId;
+    }
+
+    const screenshots = await Screenshot.find(filter)
+      .populate('userId', 'name email avatar employeeId')
+      .sort({ timestamp: 1 });
+
+    // Group by hour
+    const byHour: Record<string, typeof screenshots> = {};
+    for (const s of screenshots) {
+      const hour = new Date(s.timestamp).getHours();
+      const key = `${String(hour).padStart(2, '0')}:00`;
+      if (!byHour[key]) byHour[key] = [];
+      byHour[key].push(s);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        date: targetDate.toISOString().split('T')[0],
+        total: screenshots.length,
+        timeline: byHour,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/screenshots/view/grid
+// Returns screenshots in a paginated grid layout
+// ─────────────────────────────────────────────────────────────────────────────
+export const getScreenshotGrid = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const tenantId = req.user?.tenantId;
+    const { page = 1, limit = 24, userId, date, startDate, endDate, tag } = req.query as Record<string, string>;
+    const { skip, limit: lim } = paginate(Number(page), Number(limit));
+
+    const filter: Record<string, unknown> = { tenantId };
+
+    if (req.user?.role === 'employee') {
+      filter.userId = req.user._id;
+    } else if (userId) {
+      filter.userId = userId;
+    }
+
+    if (tag) filter.productivityTag = tag;
+
+    if (date) {
+      const d = new Date(date);
+      const s = new Date(d); s.setHours(0, 0, 0, 0);
+      const e = new Date(d); e.setHours(23, 59, 59, 999);
+      filter.timestamp = { $gte: s, $lte: e };
+    } else if (startDate || endDate) {
+      filter.timestamp = {};
+      if (startDate) (filter.timestamp as any).$gte = new Date(startDate);
+      if (endDate)   (filter.timestamp as any).$lte = new Date(endDate);
+    }
+
+    const [screenshots, total] = await Promise.all([
+      Screenshot.find(filter)
+        .populate('userId', 'name email avatar')
+        .skip(skip)
+        .limit(lim)
+        .sort({ timestamp: -1 }),
+      Screenshot.countDocuments(filter),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        screenshots,
+        pagination: { total, page: Number(page), limit: lim, pages: Math.ceil(total / lim) },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/screenshots/view/download?id=xxx
+// Redirect to the image URL for download
+// ─────────────────────────────────────────────────────────────────────────────
+export const downloadScreenshot = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { id } = req.query as Record<string, string>;
+    const tenantId = req.user?.tenantId;
+
+    if (!id) {
+      res.status(400).json({ success: false, message: 'Screenshot id is required.' });
+      return;
+    }
+
+    const screenshot = await Screenshot.findOne({ _id: id, tenantId });
+    if (!screenshot) {
+      res.status(404).json({ success: false, message: 'Screenshot not found.' });
+      return;
+    }
+
+    // Return the URL for the client to download
+    res.json({
+      success: true,
+      data: {
+        downloadUrl: screenshot.imageUrl,
+        thumbnailUrl: screenshot.thumbnailUrl,
+        filename: `screenshot_${screenshot.userId}_${new Date(screenshot.timestamp).toISOString().replace(/:/g, '-')}.png`,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/screenshots/view/filters
+// Returns available filter options (employees list, date range, tags)
+// ─────────────────────────────────────────────────────────────────────────────
+export const getScreenshotFilters = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const tenantId = req.user?.tenantId;
+
+    const [employees, dateRange] = await Promise.all([
+      // All employees who have screenshots
+      Screenshot.distinct('userId', { tenantId }).then(async (ids) => {
+        return User.find({ _id: { $in: ids } }, 'name email employeeId department');
+      }),
+
+      // Oldest and newest screenshot dates
+      Promise.all([
+        Screenshot.findOne({ tenantId }).sort({ timestamp: 1 }).select('timestamp'),
+        Screenshot.findOne({ tenantId }).sort({ timestamp: -1 }).select('timestamp'),
+      ]),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        employees,
+        productivityTags: ['productive', 'neutral', 'unproductive'],
+        dateRange: {
+          earliest: dateRange[0]?.timestamp || null,
+          latest:   dateRange[1]?.timestamp || null,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

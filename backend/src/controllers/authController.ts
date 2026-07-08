@@ -401,7 +401,10 @@ interface JwtPayload {
 
 const refreshToken = async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
   try {
-    const token = req.cookies?.ems_refresh_token;
+    let token = req.cookies?.ems_refresh_token;
+    if (!token) {
+      token = req.headers['x-refresh-token'] as string || req.body?.refreshToken;
+    }
 
     if (!token) {
       res.status(401).json({ success: false, message: 'Refresh token not found.' });

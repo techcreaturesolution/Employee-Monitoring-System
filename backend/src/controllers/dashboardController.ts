@@ -215,3 +215,52 @@ const getEmployeeDashboard = async (req: AuthRequest, res: Response, next: NextF
 };
 
 export { getAdminDashboard, getEmployeeDashboard };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/dashboard/super-admin
+// Cross-tenant platform-wide stats (super_admin only)
+// ─────────────────────────────────────────────────────────────────────────────
+export const getSuperAdminDashboard = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const today = formatDate(new Date());
+
+    const [
+      totalTenants,
+      totalUsers,
+      activeUsers,
+      todayScreenshots,
+      todayAttendanceCount,
+      tenantBreakdown,
+    ] = await Promise.all([
+      User.distinct('tenantId').then((ids) => ids.length),
+      User.countDocuments({ role: { $ne: 'super_admin' } }),
+      User.countDocuments({ status: 'active', role: { $ne: 'super_admin' } }),
+      Screenshot.countDocuments({ timestamp: { $gte: new Date(today) } }),
+      Attendance.countDocuments({ date: today }),
+      User.aggregate([
+        { $match: { role: { $ne: 'super_admin' } } },
+        { $group: { _id: '$tenantId', employeeCount: { $sum: 1 }, activeCount: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } } } },
+        { $lookup: { from: 'tenants', localField: '_id', foreignField: '_id', as: 'tenant' } },
+        { $unwind: { path: '$tenant', preserveNullAndEmptyArrays: true } },
+        { $project: { tenantName: '$tenant.name', employeeCount: 1, activeCount: 1 } },
+        { $sort: { employeeCount: -1 } },
+      ]),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        platform: { totalTenants, totalUsers, activeUsers, todayScreenshots, todayAttendanceCount },
+        tenantBreakdown,
+      },
+    });
+  } catch (error) {
+    logger.error('Super Admin Dashboard failed:', error);
+    next(error);
+  }
+};
+

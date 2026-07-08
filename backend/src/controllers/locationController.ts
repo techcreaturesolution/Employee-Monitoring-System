@@ -170,7 +170,12 @@ export const getLiveLocations = async (req: AuthRequest, res: Response): Promise
     const liveData = employees
       .filter((e) => e.lastKnownLocation?.latitude && e.lastKnownLocation?.longitude)
       .map((e) => {
-        const loc = e.lastKnownLocation!;
+        const loc = {
+          latitude: e.lastKnownLocation!.latitude,
+          longitude: e.lastKnownLocation!.longitude,
+          address: e.lastKnownLocation!.address || '',
+          updatedAt: e.lastKnownLocation!.updatedAt,
+        };
         const matchedOffice = officeLocations.length > 0
           ? getMatchedOffice(loc.latitude, loc.longitude, officeLocations)
           : null;
@@ -179,6 +184,12 @@ export const getLiveLocations = async (req: AuthRequest, res: Response): Promise
         let locationStatus: string;
         if (matchedOffice) {
           locationStatus = `At Office – ${matchedOffice.name}`;
+          const office = officeLocations.find(o => o.name === matchedOffice.name);
+          if (office) {
+            loc.latitude = office.latitude;
+            loc.longitude = office.longitude;
+            loc.address = `Office – ${office.name}`;
+          }
         } else if (e.workMode === 'wfh') {
           locationStatus = 'Work From Home';
         } else if (e.workMode === 'field') {
@@ -282,4 +293,93 @@ export const getMyCurrentLocation = async (req: AuthRequest, res: Response): Pro
     res.status(500).json({ success: false, message: 'Failed to get current location.', error: (error as Error).message });
   }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/location/distance?userId=xxx&date=2026-07-01
+// Calculate total distance traveled by an employee on a given day
+// ─────────────────────────────────────────────────────────────────────────────
+export const getLocationDistance = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const tenantId = req.user?.tenantId;
+    const { userId, date } = req.query as Record<string, string>;
+
+    if (!userId || !date) {
+      res.status(400).json({ success: false, message: 'userId and date are required.' });
+      return;
+    }
+
+    const startOfDay = new Date(date); startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay   = new Date(date); endOfDay.setHours(23, 59, 59, 999);
+
+    const points = await LocationLog.find({ tenantId, userId, timestamp: { $gte: startOfDay, $lte: endOfDay } }).sort({ timestamp: 1 });
+
+    // Haversine distance formula
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const haversine = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+      const R = 6371e3; // Earth radius in metres
+      const φ1 = toRad(lat1); const φ2 = toRad(lat2);
+      const Δφ = toRad(lat2 - lat1); const Δλ = toRad(lon2 - lon1);
+      const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    let totalMeters = 0;
+    const segments: { from: object; to: object; distanceMeters: number }[] = [];
+
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const dist = haversine(prev.latitude, prev.longitude, curr.latitude, curr.longitude);
+      totalMeters += dist;
+      segments.push({
+        from: { lat: prev.latitude, lng: prev.longitude, time: prev.timestamp },
+        to:   { lat: curr.latitude, lng: curr.longitude, time: curr.timestamp },
+        distanceMeters: Math.round(dist),
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        date,
+        userId,
+        totalMeters: Math.round(totalMeters),
+        totalKm: Math.round(totalMeters / 100) / 10,
+        pointCount: points.length,
+        segments,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to calculate distance.', error: (error as Error).message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/location/geofence
+// List all configured geofences (office locations) for the tenant
+// ─────────────────────────────────────────────────────────────────────────────
+export const getGeofenceList = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const tenantId = req.user?.tenantId;
+    const tenant = await Tenant.findById(tenantId, 'settings.officeLocations name');
+
+    if (!tenant) {
+      res.status(404).json({ success: false, message: 'Tenant not found.' });
+      return;
+    }
+
+    const geofences = (tenant.settings?.officeLocations || []).map((loc: any, idx: number) => ({
+      id: idx,
+      name: loc.name || `Office ${idx + 1}`,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      radiusMeters: loc.radiusMeters || 200,
+    }));
+
+    res.json({ success: true, data: { geofences, count: geofences.length } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to get geofences.', error: (error as Error).message });
+  }
+};
+
 

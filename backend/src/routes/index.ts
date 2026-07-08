@@ -16,6 +16,10 @@ import productivityRoutes from './productivityRoutes';
 import leaveRoutes from './leaveRoutes';
 import notificationRoutes from './notificationRoutes';
 import reportRoutes from './reportRoutes';
+import managerRoutes from './managerRoutes';
+import companyRoutes from './companyRoutes';
+import auditRoutes from './auditRoutes';
+import subscriptionRoutes from './subscriptionRoutes';
 
 const router = Router();
 
@@ -36,5 +40,9 @@ router.use('/productivity', productivityRoutes);
 router.use('/leaves', leaveRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/reports', reportRoutes);
+router.use('/managers', managerRoutes);
+router.use('/company', companyRoutes);
+router.use('/audit-logs', auditRoutes);
+router.use('/subscriptions', subscriptionRoutes);
 
 export default router;

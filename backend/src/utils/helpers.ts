@@ -95,3 +95,9 @@ export const getMatchedOffice = (
   }
   return null;
 };
+
+export const isActiveBreak = (b: { endTime?: Date }): boolean => {
+  if (!b.endTime) return true;
+  const time = new Date(b.endTime).getTime();
+  return isNaN(time) || time === 0;
+};

@@ -54,6 +54,7 @@ class AgentService {
 
     // powerMonitor is only accessible after app is ready
     const { powerMonitor } = require('electron');
+    this.powerMonitor = powerMonitor;
     powerMonitor.on('suspend', () => {
       console.log('System suspending, pausing tracking...');
       this.stop();
@@ -204,7 +205,7 @@ class AgentService {
 
   async checkIdle() {
     try {
-      const idleTime = powerMonitor.getSystemIdleTime();
+      const idleTime = this.powerMonitor.getSystemIdleTime();
       const thresholdSeconds = 300; // 5 minutes threshold
       
       const wasIdle = this.isUserIdle;
@@ -315,36 +316,70 @@ class AgentService {
     return null;
   }
 
+  setLastKnownLocation(coords) {
+    this.lastKnownLocation = coords;
+    this.lastKnownLocationTime = Date.now();
+  }
+
   async fetchIPLocation() {
     let coords = null;
+    let directAddress = null; // city string returned directly by the API (may already be precise)
 
-    // Step 1: Get coordinates from IP geolocation
-    try {
-      const res = await axios.get('https://freeipapi.com/api/json', { timeout: 5000 });
-      if (res.data && res.data.latitude && res.data.longitude) {
-        coords = { latitude: res.data.latitude, longitude: res.data.longitude };
-      }
-    } catch (err) {
-      console.warn('[Agent] freeipapi.com failed, trying ip-api.com...');
+    // Priority 1: Use precise OS-level location from renderer if fresh (< 15 minutes old)
+    if (this.lastKnownLocation && (Date.now() - this.lastKnownLocationTime < 15 * 60 * 1000)) {
+      coords = this.lastKnownLocation;
+    }
+
+    if (!coords) {
+      // Priority 2: ipinfo.io — provides city field directly from BGP routing tables
+      // and tends to be far more accurate than freeipapi for Indian cities.
       try {
-        const res = await axios.get('http://ip-api.com/json/', { timeout: 5000 });
-        if (res.data && res.data.status === 'success') {
-          coords = { latitude: res.data.lat, longitude: res.data.lon };
+        const res = await axios.get('https://ipinfo.io/json', {
+          timeout: 5000,
+          headers: { 'Accept': 'application/json' }
+        });
+        if (res.data && res.data.loc) {
+          const [lat, lon] = res.data.loc.split(',').map(Number);
+          if (lat && lon) {
+            coords = { latitude: lat, longitude: lon };
+            // Build a human-readable address from the fields ipinfo returns
+            const city = res.data.city || '';
+            const region = res.data.region || '';
+            const country = res.data.country || '';
+            if (city) directAddress = [city, region, country].filter(Boolean).join(', ');
+          }
         }
-      } catch (err2) {
-        console.error('[Agent] All IP location services failed:', err2.message);
+      } catch (err) {
+        console.warn('[Agent] ipinfo.io failed, trying ip-api.com...');
+      }
+
+      // Priority 3: ip-api.com as second fallback (also returns city)
+      if (!coords) {
+        try {
+          const res = await axios.get('https://ip-api.com/json/?fields=status,lat,lon,city,regionName,country', { timeout: 5000 });
+          if (res.data && res.data.status === 'success') {
+            coords = { latitude: res.data.lat, longitude: res.data.lon };
+            if (res.data.city) {
+              directAddress = [res.data.city, res.data.regionName, res.data.country].filter(Boolean).join(', ');
+            }
+          }
+        } catch (err2) {
+          console.error('[Agent] All IP location services failed:', err2.message);
+        }
       }
     }
 
     if (!coords) return null;
 
-    // Step 2: Reverse-geocode coordinates → accurate city name (e.g. Gandhinagar, not Ahmedabad)
-    const accurateAddress = await this.reverseGeocodeNominatim(coords.latitude, coords.longitude);
+    // Final step: Nominatim reverse-geocoding gives the most precise local address
+    // (correctly identifies Gandhinagar vs Ahmedabad using actual GPS coordinates)
+    const nominatimAddress = await this.reverseGeocodeNominatim(coords.latitude, coords.longitude);
 
     return {
       latitude: coords.latitude,
       longitude: coords.longitude,
-      address: accurateAddress || 'IP Location'
+      // Prefer Nominatim (most accurate) → directAddress from API → generic fallback
+      address: nominatimAddress || directAddress || 'IP Location'
     };
   }
 

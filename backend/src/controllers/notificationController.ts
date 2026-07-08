@@ -86,3 +86,34 @@ export const deleteNotification = async (req: AuthRequest, res: Response, next: 
     next(error);
   }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/notifications
+// Admin/manager can create a system notification for target users
+// ─────────────────────────────────────────────────────────────────────────────
+export const createNotificationEntry = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const tenantId = req.user?.tenantId;
+    const { userId, title, message, type, link } = req.body;
+
+    if (!userId || !title || !message) {
+      res.status(400).json({ success: false, message: 'userId, title, and message are required.' });
+      return;
+    }
+
+    const notif = await Notification.create({
+      tenantId,
+      userId,
+      title,
+      message,
+      type: type || 'system',
+      link: link || '',
+      read: false,
+    });
+
+    res.status(201).json({ success: true, message: 'Notification created.', data: notif });
+  } catch (error) {
+    next(error);
+  }
+};
+

@@ -6,7 +6,7 @@ import { ActivityLog } from '../models/ActivityLog';
 import { Attendance } from '../models/Attendance';
 import { Tenant } from '../models/Tenant';
 import { AuthRequest } from '../middleware/auth';
-import { formatDate, calculateWorkMinutes } from '../utils/helpers';
+import { formatDate, calculateWorkMinutes, isActiveBreak } from '../utils/helpers';
 import path from 'path';
 import fs from 'fs';
 import { uploadToCloudinary, getCloudinaryThumbnail, isCloudinaryConfigured } from '../utils/cloudinary';
@@ -235,7 +235,7 @@ export const getAgentStatus = async (req: AuthRequest, res: Response): Promise<v
     let totalBreakMinutes = 0;
     if (attendance) {
       let breakSum = attendance.breaks.reduce((sum, b) => sum + (b.duration || 0), 0);
-      const activeBreak = attendance.breaks.find((b) => !b.endTime);
+      const activeBreak = attendance.breaks.find((b) => isActiveBreak(b));
       if (activeBreak) {
         const elapsedActiveBreak = calculateWorkMinutes(activeBreak.startTime, new Date());
         breakSum += elapsedActiveBreak;
@@ -250,7 +250,7 @@ export const getAgentStatus = async (req: AuthRequest, res: Response): Promise<v
       totalWorkMinutes = Math.max(0, elapsed - totalBreakMinutes - idleTime);
     }
 
-    const activeBreak = attendance?.breaks.find((b) => !b.endTime);
+    const activeBreak = attendance?.breaks.find((b) => isActiveBreak(b));
     const isOnBreak = !!activeBreak;
 
     res.status(200).json({ success: true, data: { isPunchedIn, punchInTime, totalWorkMinutes, totalBreakMinutes, isOnBreak, breaks: attendance?.breaks || [] } });

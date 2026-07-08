@@ -4,8 +4,21 @@ import { AuthRequest } from '../middleware/auth';
 import { Tenant } from '../models/Tenant';
 import { User } from '../models/User';
 import { createNotification } from '../utils/notification';
-import { formatDate, calculateWorkMinutes, paginate } from '../utils/helpers';
+import { formatDate, calculateWorkMinutes, paginate, isInsideGeofence, getMatchedOffice, isActiveBreak } from '../utils/helpers';
 import { logger } from '../utils/logger';
+import axios from 'axios';
+
+const reverseGeocode = async (latitude: number, longitude: number): Promise<string> => {
+  try {
+    const res = await axios.get(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`, {
+      headers: { 'User-Agent': 'EMS-Employee-Monitoring-System' }
+    });
+    return res.data?.display_name || `${latitude}, ${longitude}`;
+  } catch (error: any) {
+    logger.error(`Reverse geocode failed: ${error.message}`);
+    return `${latitude}, ${longitude}`;
+  }
+};
 
 const punchIn = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -21,17 +34,62 @@ const punchIn = async (req: AuthRequest, res: Response, next: NextFunction): Pro
 
     const { ip, location, screenshotUrl, method, workMode } = req.body;
 
+    const tenant = await Tenant.findById(tenantId);
+    const officeLocations = tenant?.settings?.officeLocations || [];
+
+    let insideGeofence = false;
+    let punchLocation = { latitude: 0, longitude: 0, address: 'Remote Location', accuracy: 0 };
+
+    if (location && location.latitude && location.longitude) {
+      insideGeofence = isInsideGeofence(location.latitude, location.longitude, officeLocations);
+      if (insideGeofence) {
+        const matchedOffice = getMatchedOffice(location.latitude, location.longitude, officeLocations);
+        if (matchedOffice) {
+          const office = officeLocations.find(o => o.name === matchedOffice.name);
+          if (office) {
+            punchLocation = {
+              latitude: office.latitude,
+              longitude: office.longitude,
+              address: `Office – ${office.name}`,
+              accuracy: location.accuracy || 0,
+            };
+          }
+        }
+      } else {
+        const address = location.address || await reverseGeocode(location.latitude, location.longitude);
+        punchLocation = {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          address,
+          accuracy: location.accuracy || 0,
+        };
+      }
+    }
+
     const attendance = existing || new Attendance({ userId, tenantId, date: today });
-    attendance.workMode = workMode || req.user?.workMode || 'office';
+    attendance.workMode = insideGeofence ? 'office' : (workMode || req.user?.workMode || 'office');
     attendance.punchIn = {
       time: new Date(),
       ip: ip || req.ip || '',
-      location: location || { latitude: 0, longitude: 0, address: '', accuracy: 0 },
+      location: punchLocation,
       screenshotUrl: screenshotUrl || '',
       method: method || 'web',
-      isInsideGeofence: false,
+      isInsideGeofence: insideGeofence,
     };
-    const tenant = await Tenant.findById(tenantId);
+
+    if (location && location.latitude && location.longitude) {
+      await User.findByIdAndUpdate(userId, {
+        lastKnownLocation: {
+          latitude: punchLocation.latitude,
+          longitude: punchLocation.longitude,
+          address: punchLocation.address,
+          updatedAt: new Date(),
+        },
+        lastActive: new Date(),
+        isOnline: true,
+      });
+    }
+
     let isLate = false;
     if (tenant?.settings?.workStartTime) {
       const [startHour, startMin] = tenant.settings.workStartTime.split(':').map(Number);
@@ -82,18 +140,64 @@ const punchIn = async (req: AuthRequest, res: Response, next: NextFunction): Pro
 const punchOut = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const userId = req.user?._id;
+    const tenantId = req.user?.tenantId;
     const today = formatDate(new Date());
 
     const { ip, location, screenshotUrl, method } = req.body;
 
+    const tenant = await Tenant.findById(tenantId);
+    const officeLocations = tenant?.settings?.officeLocations || [];
+
+    let insideGeofence = false;
+    let punchLocation = { latitude: 0, longitude: 0, address: 'Remote Location', accuracy: 0 };
+
+    if (location && location.latitude && location.longitude) {
+      insideGeofence = isInsideGeofence(location.latitude, location.longitude, officeLocations);
+      if (insideGeofence) {
+        const matchedOffice = getMatchedOffice(location.latitude, location.longitude, officeLocations);
+        if (matchedOffice) {
+          const office = officeLocations.find(o => o.name === matchedOffice.name);
+          if (office) {
+            punchLocation = {
+              latitude: office.latitude,
+              longitude: office.longitude,
+              address: `Office – ${office.name}`,
+              accuracy: location.accuracy || 0,
+            };
+          }
+        }
+      } else {
+        const address = location.address || await reverseGeocode(location.latitude, location.longitude);
+        punchLocation = {
+          latitude: location.latitude,
+          longitude: location.longitude,
+          address,
+          accuracy: location.accuracy || 0,
+        };
+      }
+    }
+
     const punchOutData = {
       time: new Date(),
       ip: ip || req.ip || '',
-      location: location || { latitude: 0, longitude: 0, address: '', accuracy: 0 },
+      location: punchLocation,
       screenshotUrl: screenshotUrl || '',
       method: method || 'web',
-      isInsideGeofence: false,
+      isInsideGeofence: insideGeofence,
     };
+
+    if (location && location.latitude && location.longitude) {
+      await User.findByIdAndUpdate(userId, {
+        lastKnownLocation: {
+          latitude: punchLocation.latitude,
+          longitude: punchLocation.longitude,
+          address: punchLocation.address,
+          updatedAt: new Date(),
+        },
+        lastActive: new Date(),
+        isOnline: false,
+      });
+    }
 
     const attendance = await Attendance.findOneAndUpdate(
       {
@@ -146,7 +250,7 @@ const startBreak = async (req: AuthRequest, res: Response, next: NextFunction): 
       return;
     }
 
-    const activeBreak = attendance.breaks.find((b) => !b.endTime);  // ✅ FIX: Use !b.endTime (null/undefined)
+    const activeBreak = attendance.breaks.find((b) => isActiveBreak(b));
     if (activeBreak) {
       res.status(400).json({ success: false, message: 'Already on a break.' });
       return;
@@ -179,7 +283,7 @@ const endBreak = async (req: AuthRequest, res: Response, next: NextFunction): Pr
     }
 
     // ✅ FIX 2: Simpler check - only need to check if endTime is null/undefined
-    const activeBreak = attendance.breaks.find((b) => !b.endTime);
+    const activeBreak = attendance.breaks.find((b) => isActiveBreak(b));
     if (!activeBreak) {
       res.status(400).json({ success: false, message: 'No active break found.' });
       return;
@@ -218,7 +322,7 @@ const getTodayAttendance = async (req: AuthRequest, res: Response, next: NextFun
     const attendanceObj = attendance ? attendance.toObject() : null;
     if (attendanceObj && attendanceObj.punchIn && !attendanceObj.punchOut) {
       let breakSum = attendanceObj.breaks.reduce((sum: number, b: any) => sum + (b.duration || 0), 0);
-      const activeBreak = attendanceObj.breaks.find((b: any) => !b.endTime);
+      const activeBreak = attendanceObj.breaks.find((b: any) => isActiveBreak(b));
       if (activeBreak) {
         const elapsedActiveBreak = calculateWorkMinutes(activeBreak.startTime, new Date());
         breakSum += elapsedActiveBreak;
@@ -243,7 +347,8 @@ const getAttendanceHistory = async (req: AuthRequest, res: Response, next: NextF
     const { page = 1, limit = 30, startDate, endDate, userId } = req.query;
     const { skip, limit: lim } = paginate(Number(page), Number(limit));
 
-    const filter: Record<string, unknown> = { tenantId };
+    const todayStr = formatDate(new Date());
+    const filter: Record<string, any> = { tenantId };
 
     if (req.user?.role === 'employee') {
       filter.userId = req.user._id;
@@ -253,8 +358,11 @@ const getAttendanceHistory = async (req: AuthRequest, res: Response, next: NextF
 
     if (startDate || endDate) {
       filter.date = {};
-      if (startDate) (filter.date as Record<string, unknown>).$gte = startDate;
-      if (endDate) (filter.date as Record<string, unknown>).$lte = endDate;
+      if (startDate) filter.date.$gte = startDate;
+      const maxDate = endDate ? (endDate < todayStr ? (endDate as string) : todayStr) : todayStr;
+      filter.date.$lte = maxDate;
+    } else {
+      filter.date = { $lte: todayStr };
     }
 
     const [records, total] = await Promise.all([
@@ -266,12 +374,11 @@ const getAttendanceHistory = async (req: AuthRequest, res: Response, next: NextF
       Attendance.countDocuments(filter),
     ]);
 
-    const todayStr = formatDate(new Date());
     const updatedRecords = records.map((record) => {
       const obj = record.toObject();
       if (obj.date === todayStr && obj.punchIn && !obj.punchOut) {
         let breakSum = obj.breaks.reduce((sum: number, b: any) => sum + (b.duration || 0), 0);
-        const activeBreak = obj.breaks.find((b: any) => !b.endTime);
+        const activeBreak = obj.breaks.find((b: any) => isActiveBreak(b));
         if (activeBreak) {
           const elapsedActiveBreak = calculateWorkMinutes(activeBreak.startTime, new Date());
           breakSum += elapsedActiveBreak;
@@ -303,11 +410,15 @@ const getAttendanceReport = async (req: AuthRequest, res: Response, next: NextFu
     const tenantId = req.user?.tenantId;
     const { startDate, endDate } = req.query;
 
-    const matchFilter: Record<string, unknown> = { tenantId };
+    const todayStr = formatDate(new Date());
+    const matchFilter: Record<string, any> = { tenantId };
     if (startDate || endDate) {
       matchFilter.date = {};
-      if (startDate) (matchFilter.date as Record<string, unknown>).$gte = startDate;
-      if (endDate) (matchFilter.date as Record<string, unknown>).$lte = endDate;
+      if (startDate) matchFilter.date.$gte = startDate;
+      const maxDate = endDate ? (endDate < todayStr ? (endDate as string) : todayStr) : todayStr;
+      matchFilter.date.$lte = maxDate;
+    } else {
+      matchFilter.date = { $lte: todayStr };
     }
 
     const report = await Attendance.aggregate([

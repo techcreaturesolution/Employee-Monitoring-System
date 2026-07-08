@@ -5,10 +5,42 @@ const { app } = require('electron');
 const sqlite3 = require('sqlite3').verbose();
 
 // ============ SECURE TOKEN STORAGE ============
-const tokenStore = new Store({
-  name: 'ems-tokens',
-  encryptionKey: process.env.ENCRYPTION_KEY || 'dev-key-change-in-production',
-});
+const fs = require('fs');
+const encryptionKey = process.env.ENCRYPTION_KEY;
+if (!encryptionKey && require('electron').app.isPackaged) {
+  throw new Error('ENCRYPTION_KEY env var must be set for production builds.');
+}
+
+let tokenStore;
+try {
+  tokenStore = new Store({
+    name: 'ems-tokens',
+    encryptionKey: encryptionKey || 'dev-only-not-secure',
+  });
+  // Attempt a test read to trigger decryption/parsing and detect corruption/key mismatches early
+  tokenStore.get('accessToken');
+} catch (e) {
+  console.error('Failed to initialize/decrypt secure token store. Resetting store to clear corruption...', e);
+  try {
+    const storePath = path.join(app.getPath('userData'), 'ems-tokens.json');
+    if (fs.existsSync(storePath)) {
+      fs.unlinkSync(storePath);
+      console.log('Successfully deleted corrupted/incompatible store file:', storePath);
+    }
+    tokenStore = new Store({
+      name: 'ems-tokens',
+      encryptionKey: encryptionKey || 'dev-only-not-secure',
+    });
+  } catch (err) {
+    console.error('Failed to recreate token store after deletion. Falling back to in-memory store...', err);
+    const memoryData = {};
+    tokenStore = {
+      get: (key) => memoryData[key],
+      set: (key, val) => { memoryData[key] = val; },
+      delete: (key) => { delete memoryData[key]; },
+    };
+  }
+}
 
 // ============ SQLITE DATABASE FOR OFFLINE QUEUE ============
 const dbPath = path.join(app.getPath('userData'), 'ems-data.db');

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').trim();
 
 // ─── Shared Dynamic AppLogo Component ───────────────────────────────────────
 function AppLogo({ appName, windowTitle = '', className = 'w-6 h-6' }: { appName: string; windowTitle?: string; className?: string }) {
@@ -295,6 +295,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [serverConnected, setServerConnected] = useState(true);
   const [autoStart, setAutoStart] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showProjects, setShowProjects] = useState(false);
   const [topApps, setTopApps] = useState<any[]>([]);
   const [isOnBreak, setIsOnBreak] = useState(false);
   const [todayBreaks, setTodayBreaks] = useState<any[]>([]);
@@ -392,10 +393,10 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
     try {
       const res = await customFetch(`${API_URL}/projects`, { headers: headers() });
       const data = await res.json();
-      if (data.success && data.data) {
-        setProjects(data.data);
-        if (data.data.length > 0 && selectedProject === 'Select Project') {
-          setSelectedProject(data.data[0].name);
+      if (data.success && data.data && data.data.projects) {
+        setProjects(data.data.projects);
+        if (data.data.projects.length > 0 && selectedProject === 'Select Project') {
+          setSelectedProject(data.data.projects[0].name);
         }
       }
     } catch {
@@ -532,6 +533,33 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
       }
     }
   }, []);
+
+  // Query precise HTML5 Geolocation (OS-level) and report back to the main process
+  useEffect(() => {
+    if (punchStatus !== 'in') return;
+    const updateLoc = () => {
+      const api = eAPI();
+      if (!api || !api.updateLocation) return;
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const coords = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            };
+            api.updateLocation(coords);
+          },
+          (err) => {
+            console.warn('[Precise Geolocation] navigator.geolocation error:', err.message);
+          },
+          { enableHighAccuracy: true, timeout: 15000 }
+        );
+      }
+    };
+    updateLoc();
+    const id = setInterval(updateLoc, 10 * 60 * 1000); // Poll every 10 minutes
+    return () => clearInterval(id);
+  }, [punchStatus]);
 
   // Poll active app and update productivity stats in 5-second steps
   useEffect(() => {
@@ -879,9 +907,30 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                         <span><HMDisplay baseElapsedSec={baseElapsedSec} active={punchStatus === 'in'} /> / {WORK_HOURS} hr</span>
                         <span>{WORK_HOURS} hr</span>
                       </div>
-                      <button onClick={() => handlePunch('out')} className="w-full py-2.5 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
-                        {Icon.punchout} Punch Out
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          disabled={_loading}
+                          onClick={handleBreakToggle}
+                          className={`flex-1 py-2.5 border rounded-lg transition-colors flex items-center justify-center gap-2 text-xs font-semibold ${_loading ? 'opacity-50 cursor-not-allowed' : ''} ${
+                            isOnBreak
+                              ? 'border-amber-500 hover:border-amber-400 text-amber-400 bg-amber-500/10'
+                              : 'border-[#21262d] hover:border-blue-500/50 text-slate-300 bg-[#0d1117]'
+                          }`}
+                        >
+                          <svg className={`w-4 h-4 ${isOnBreak ? 'text-amber-400' : 'text-blue-400'} ${_loading ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" /></svg>
+                          <span>{_loading ? 'Loading...' : (isOnBreak ? 'End Break' : 'Start Break')}</span>
+                        </button>
+                        <button
+                          disabled={_loading}
+                          onClick={() => handlePunch('out')}
+                          className={`flex-1 py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 ${_loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {_loading ? (
+                            <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                          ) : Icon.punchout}
+                          {_loading ? 'Loading...' : 'Punch Out'}
+                        </button>
+                      </div>
                     </>
                   ) : (
                     <>
@@ -891,8 +940,15 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
                           <p className="text-2xl font-bold">{formatHM(totalSec)}</p>
                         </div>
                       )}
-                      <button onClick={() => handlePunch('in')} className="w-full py-2.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
-                        {Icon.punchin} Punch In
+                      <button
+                        disabled={_loading}
+                        onClick={() => handlePunch('in')}
+                        className={`w-full py-2.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 ${_loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {_loading ? (
+                          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                        ) : Icon.punchin}
+                        {_loading ? 'Loading...' : 'Punch In'}
                       </button>
                     </>
                   )}
@@ -1248,27 +1304,23 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
             {/* Quick Actions (4th SS) */}
             <div className="bg-[#161b22] border border-[#21262d] rounded-xl p-4">
               <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-3">Quick Actions</p>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
-                  onClick={handleBreakToggle}
-                  className={`flex flex-col items-center gap-1.5 p-2 bg-[#0d1117] border rounded-lg transition-colors ${
-                    isOnBreak
-                      ? 'border-amber-500 hover:border-amber-400 text-amber-400'
-                      : 'border-[#21262d] hover:border-blue-500/50 text-slate-300'
-                  }`}
+                  disabled={_loading}
+                  onClick={() => setShowProjects(true)}
+                  className={`flex flex-col items-center gap-1.5 p-2 bg-[#0d1117] border border-[#21262d] hover:border-blue-500/50 rounded-lg text-slate-300 transition-colors ${_loading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  <svg className={`w-4 h-4 ${isOnBreak ? 'text-amber-400' : 'text-blue-400'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" /></svg>
-                  <span className="text-[10px]">{isOnBreak ? 'End Break' : 'Start Break'}</span>
-                </button>
-
-                <button className="flex flex-col items-center gap-1.5 p-2 bg-[#0d1117] border border-[#21262d] hover:border-blue-500/50 rounded-lg text-slate-300 transition-colors">
                   <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
                   <span className="text-[10px]">Projects</span>
                 </button>
 
-                <button onClick={() => { fetchTasks(); }} className="flex flex-col items-center gap-1.5 p-2 bg-[#0d1117] border border-[#21262d] hover:border-blue-500/50 rounded-lg text-slate-300 transition-colors">
-                  <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" /></svg>
-                  <span className="text-[10px]">Sync Now</span>
+                <button
+                  disabled={_loading}
+                  onClick={() => { refreshAll(); }}
+                  className={`flex flex-col items-center gap-1.5 p-2 bg-[#0d1117] border border-[#21262d] hover:border-blue-500/50 rounded-lg text-slate-300 transition-colors ${_loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <svg className={`w-4 h-4 text-blue-400 ${_loading ? 'animate-spin' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" /></svg>
+                  <span className="text-[10px]">{_loading ? 'Syncing...' : 'Sync Now'}</span>
                 </button>
 
                 <button onClick={() => setShowSettings(true)} className="flex flex-col items-center gap-1.5 p-2 bg-[#0d1117] border border-[#21262d] hover:border-blue-500/50 rounded-lg text-slate-300 transition-colors">
@@ -1314,6 +1366,51 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
               </div>
               <div className="px-4 py-2.5 bg-[#0d1117] border-t border-[#21262d] flex justify-end">
                 <button onClick={() => setShowSettings(false)} className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded text-xs transition-colors">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showProjects && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#161b22] border border-[#21262d] rounded-xl w-full max-w-xs overflow-hidden shadow-2xl">
+              <div className="flex justify-between items-center px-4 py-3 border-b border-[#21262d]">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300">My Projects</span>
+                <button onClick={() => setShowProjects(false)} className="text-slate-500 hover:text-white text-xs">✕</button>
+              </div>
+              <div className="p-4 space-y-2 max-h-60 overflow-y-auto">
+                {_projects.length > 0 ? (
+                  _projects.map((p: any, idx: number) => (
+                    <div
+                      key={p._id || idx}
+                      onClick={() => {
+                        setSelectedProject(p.name);
+                        setShowProjects(false);
+                      }}
+                      className={`p-2 rounded-lg border transition-colors cursor-pointer flex items-center justify-between ${
+                        selectedProject === p.name
+                          ? 'border-blue-500 bg-blue-500/10 text-white'
+                          : 'border-[#21262d] hover:border-blue-500/50 bg-[#0d1117] text-slate-300'
+                      }`}
+                    >
+                      <div>
+                        <p className="text-xs font-semibold">{p.name}</p>
+                        {p.description && <p className="text-[9px] text-slate-500 mt-0.5">{p.description}</p>}
+                      </div>
+                      {selectedProject === p.name && (
+                        <span className="text-blue-500 text-xs">✓ Active</span>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-500 italic text-center py-4">No projects assigned</p>
+                )}
+              </div>
+              <div className="px-4 py-2.5 bg-[#0d1117] border-t border-[#21262d] flex justify-between items-center">
+                <span className="text-[9px] text-slate-500">Selected: {selectedProject}</span>
+                <button onClick={() => setShowProjects(false)} className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded text-xs transition-colors">
                   Close
                 </button>
               </div>

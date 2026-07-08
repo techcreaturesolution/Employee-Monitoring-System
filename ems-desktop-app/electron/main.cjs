@@ -7,6 +7,18 @@ let tray = null;
 let isQuitting = false;
 let agentService = null; // initialised inside app.on('ready') after Electron is ready
 
+function getAgentService() {
+  if (!agentService && app.isReady()) {
+    try {
+      agentService = require('./AgentService.cjs');
+      agentService.init();
+    } catch (e) {
+      console.error('Failed to lazy-initialise AgentService:', e);
+    }
+  }
+  return agentService;
+}
+
 // ── Crash safety net ─────────────────────────────────────────────────────────
 // Writes unhandled exceptions to a log file on disk so startup crashes are
 // never silently swallowed when the app is launched from Explorer / taskbar.
@@ -68,6 +80,22 @@ if (!gotTheLock) {
     } catch (e) {
       console.error('Failed to initialise AgentService:', e);
     }
+
+    // Set permission request/check handlers to automatically grant geolocation & notifications
+    const { session } = require('electron');
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+      if (permission === 'geolocation' || permission === 'notifications') {
+        return callback(true);
+      }
+      callback(false);
+    });
+
+    session.defaultSession.setPermissionCheckHandler((webContents, permission, origin) => {
+      if (permission === 'geolocation' || permission === 'notifications') {
+        return true;
+      }
+      return false;
+    });
 
     createWindow();
   });
@@ -275,7 +303,10 @@ function setupIpcListeners() {
     if (apiUrl) {
       storage.setApiUrl(apiUrl);
     }
-    agentService.setToken(token, agentKey);
+    const service = getAgentService();
+    if (service) {
+      service.setToken(token, agentKey);
+    }
     return true;
   });
 
@@ -292,29 +323,42 @@ function setupIpcListeners() {
   ipcMain.handle('clear-tokens', async () => {
     const storage = require('./storage.cjs');
     storage.clearTokens();
-    agentService.setToken(null, null);
-    agentService.stop();
+    const service = getAgentService();
+    if (service) {
+      service.setToken(null, null);
+      service.stop();
+    }
     return true;
   });
 
   ipcMain.handle('set-tracking', (event, start) => {
-    if (start) {
-      agentService.start();
-    } else {
-      agentService.stop();
+    const service = getAgentService();
+    if (service) {
+      if (start) {
+        service.start();
+      } else {
+        service.stop();
+      }
     }
     return true;
   });
 
   ipcMain.handle('set-break', (event, isOnBreak) => {
-    agentService.setBreakStatus(isOnBreak);
+    const service = getAgentService();
+    if (service) {
+      service.setBreakStatus(isOnBreak);
+    }
     return true;
   });
 
   ipcMain.handle('capture-screenshot', async () => {
     try {
-      await agentService.captureScreenshot();
-      return true;
+      const service = getAgentService();
+      if (service) {
+        await service.captureScreenshot();
+        return true;
+      }
+      return false;
     } catch (e) {
       console.error('Manual screenshot capture failed:', e);
       return false;
@@ -333,6 +377,14 @@ function setupIpcListeners() {
     } catch (e) {
       return null;
     }
+  });
+
+  ipcMain.handle('update-location', async (event, coords) => {
+    const service = getAgentService();
+    if (service) {
+      service.setLastKnownLocation(coords);
+    }
+    return true;
   });
 }
 
