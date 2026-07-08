@@ -38,7 +38,12 @@ const getAdminDashboard = async (req: AuthRequest, res: Response, next: NextFunc
       User.countDocuments({ tenantId: tenantObjId, status: 'active', role: { $ne: 'super_admin' } }),
       Attendance.countDocuments({ tenantId: tenantObjId, date: today }),  // Total records
       Screenshot.countDocuments({ tenantId: tenantObjId, timestamp: { $gte: new Date(today) } }),
-      User.countDocuments({ tenantId: tenantObjId, isOnline: true, role: 'employee' }),
+      User.countDocuments({ 
+        tenantId: tenantObjId, 
+        isOnline: true, 
+        role: 'employee',
+        lastActive: { $gte: new Date(Date.now() - 5 * 60 * 1000) }
+      }),
       Screenshot.find({ tenantId: tenantObjId })
         .populate('userId', 'name email avatar')
         .sort({ timestamp: -1 })

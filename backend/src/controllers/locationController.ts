@@ -162,8 +162,17 @@ export const getLiveLocations = async (req: AuthRequest, res: Response): Promise
     const tenant = await Tenant.findById(tenantId);
     const officeLocations = tenant?.settings?.officeLocations || [];
 
+    // Filter out users who have not sent a heartbeat in the last 5 minutes (300 seconds)
+    const heartbeatThreshold = new Date(Date.now() - 5 * 60 * 1000);
+
     const employees = await User.find(
-      { tenantId, status: 'active', isOnline: true, role: 'employee' },
+      { 
+        tenantId, 
+        status: 'active', 
+        isOnline: true, 
+        role: 'employee',
+        lastActive: { $gte: heartbeatThreshold }
+      },
       'name email department workMode lastKnownLocation isOnline lastActive'
     );
 

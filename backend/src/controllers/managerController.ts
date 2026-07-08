@@ -292,6 +292,7 @@ export const getManagerDashboard = async (
         User.countDocuments({
           _id: { $in: teamIds },
           isOnline: true,
+          lastActive: { $gte: new Date(Date.now() - 5 * 60 * 1000) }
         }),
         Screenshot.find({ tenantId: tenantObjId, userId: { $in: teamIds } })
           .populate('userId', 'name email avatar')

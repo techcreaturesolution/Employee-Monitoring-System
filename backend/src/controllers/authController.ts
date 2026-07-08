@@ -318,8 +318,8 @@ const logout = async (req: AuthRequest, res: Response, next: NextFunction): Prom
   try {
     const userId = req.user?._id;
     if (userId) {
-      // 1. Mark that the desktop agent needs to log out
-      await User.findByIdAndUpdate(userId, { agentNeedsLogout: true });
+      // 1. Mark that the desktop agent needs to log out and set offline
+      await User.findByIdAndUpdate(userId, { agentNeedsLogout: true, isOnline: false });
       await cache.delete(`user:${userId}`);
       
       // 2. Punch out if punched in today

@@ -217,6 +217,18 @@ export const agentPunchIn = async (req: AuthRequest, res: Response): Promise<voi
     attendance.status = 'present';
     await attendance.save();
 
+    // Update User online status and location
+    const updateFields: any = { isOnline: true, lastActive: new Date() };
+    if (req.body.location && req.body.location.latitude && req.body.location.longitude) {
+      updateFields.lastKnownLocation = {
+        latitude: req.body.location.latitude,
+        longitude: req.body.location.longitude,
+        address: req.body.location.address || '',
+        updatedAt: new Date(),
+      };
+    }
+    await User.findByIdAndUpdate(userId, updateFields);
+
     res.status(201).json({ success: true, data: attendance });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Punch in failed.', error: (error as Error).message });
@@ -289,6 +301,10 @@ export const agentPunchOut = async (req: AuthRequest, res: Response): Promise<vo
     attendance.totalBreakMinutes = totalBreak;
 
     await attendance.save();
+
+    // Update User online status
+    await User.findByIdAndUpdate(userId, { isOnline: false, lastActive: new Date() });
+
     res.json({ success: true, data: attendance });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Punch out failed.', error: (error as Error).message });
