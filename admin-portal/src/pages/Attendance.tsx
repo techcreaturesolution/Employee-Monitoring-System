@@ -6,7 +6,7 @@ import { Clock, LogIn, LogOut, Coffee, Play, Pause } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 const Attendance: React.FC = () => {
-  const { user } = useAuth();
+  const { user, tenant } = useAuth();
   const [todayAttendance, setTodayAttendance] = useState<AttendanceType | null>(null);
   const [history, setHistory] = useState<AttendanceType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,11 +34,64 @@ const Attendance: React.FC = () => {
     fetchData();
   }, []);
 
+  const getCurrentLocation = (): Promise<GeolocationPosition | null> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported by your browser.'));
+        return;
+      }
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => resolve(position),
+        (error) => {
+          let msg = 'Failed to acquire location.';
+          if (error.code === error.PERMISSION_DENIED) {
+            msg = 'Location permission was denied. Please enable location permissions in your browser settings to punch in/out.';
+          } else if (error.code === error.POSITION_UNAVAILABLE) {
+            msg = 'Location information is unavailable.';
+          } else if (error.code === error.TIMEOUT) {
+            msg = 'Location request timed out.';
+          }
+          reject(new Error(msg));
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
+  };
+
   const handlePunchIn = async () => {
     setPunching(true);
+    let locationData = undefined;
+    
     try {
-      await attendanceAPI.punchIn({ method: 'web' });
-      toast.success('Punched In!');
+      toast.loading('Acquiring secure GPS location...', { id: 'gps-load' });
+      const position = await getCurrentLocation();
+      toast.dismiss('gps-load');
+      
+      if (position) {
+        locationData = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          address: '',
+        };
+      }
+    } catch (error: any) {
+      toast.dismiss('gps-load');
+      console.warn('Geolocation failed:', error.message);
+      
+      if (tenant?.settings?.requireLocationForPunch) {
+        toast.error(error.message || 'Location is required to Punch In.');
+        setPunching(false);
+        return;
+      } else {
+        toast.error('Could not acquire location, proceeding without it.');
+      }
+    }
+
+    try {
+      await attendanceAPI.punchIn({ method: 'web', location: locationData });
+      toast.success('Punched In successfully!');
       fetchData();
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -50,9 +103,37 @@ const Attendance: React.FC = () => {
 
   const handlePunchOut = async () => {
     setPunching(true);
+    let locationData = undefined;
+    
     try {
-      await attendanceAPI.punchOut({ method: 'web' });
-      toast.success('Punched Out!');
+      toast.loading('Acquiring secure GPS location...', { id: 'gps-load' });
+      const position = await getCurrentLocation();
+      toast.dismiss('gps-load');
+      
+      if (position) {
+        locationData = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          address: '',
+        };
+      }
+    } catch (error: any) {
+      toast.dismiss('gps-load');
+      console.warn('Geolocation failed:', error.message);
+      
+      if (tenant?.settings?.requireLocationForPunch) {
+        toast.error(error.message || 'Location is required to Punch Out.');
+        setPunching(false);
+        return;
+      } else {
+        toast.error('Could not acquire location, proceeding without it.');
+      }
+    }
+
+    try {
+      await attendanceAPI.punchOut({ method: 'web', location: locationData });
+      toast.success('Punched Out successfully!');
       fetchData();
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } };

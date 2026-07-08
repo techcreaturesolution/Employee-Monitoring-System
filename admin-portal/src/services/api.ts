@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const API_BASE = (import.meta.env.VITE_API_URL || '/api').trim();
 
 export const getFullImageUrl = (url: string) => {
   if (!url) return '';
@@ -14,6 +14,20 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 });
+
+// Request interceptor to attach bearer token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('ems_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 let isRefreshing = false;
 let failedQueue: Array<{ resolve: (value?: unknown) => void; reject: (reason?: unknown) => void }> = [];
@@ -37,6 +51,8 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       // Don't retry if the 401 was from the refresh endpoint itself
       if (originalRequest.url === '/auth/refresh-token') {
+        localStorage.removeItem('ems_token');
+        localStorage.removeItem('ems_refresh_token');
         if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
           window.location.href = '/login';
         }
@@ -59,13 +75,32 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        await axios.post(`${API_BASE}/auth/refresh-token`, {}, { withCredentials: true });
+        const localRefreshToken = localStorage.getItem('ems_refresh_token');
+        const refreshRes = await axios.post(
+          `${API_BASE}/auth/refresh-token`,
+          { refreshToken: localRefreshToken },
+          {
+            headers: { 'x-refresh-token': localRefreshToken || '' },
+            withCredentials: true,
+          }
+        );
+
+        const { accessToken, refreshToken: newRefreshToken } = refreshRes.data.data || {};
+        if (accessToken) {
+          localStorage.setItem('ems_token', accessToken);
+        }
+        if (newRefreshToken) {
+          localStorage.setItem('ems_refresh_token', newRefreshToken);
+        }
+
         isRefreshing = false;
-        processQueue(null);
+        processQueue(null, accessToken);
         return api(originalRequest);
       } catch (refreshError) {
         isRefreshing = false;
         processQueue(refreshError as Error);
+        localStorage.removeItem('ems_token');
+        localStorage.removeItem('ems_refresh_token');
         if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
           window.location.href = '/login';
         }
@@ -148,6 +183,11 @@ export const locationAPI = {
   getHistory: (params?: Record<string, string | number>) => api.get('/location/history', { params }),
   getTrail: (params: { userId: string; date: string }) => api.get('/location/trail', { params }),
   checkGeofence: (data: { latitude: number; longitude: number }) => api.post('/location/geofence-check', data),
+};
+
+export const subscriptionAPI = {
+  getStatus: () => api.get('/subscriptions/status'),
+  create: (plan: string) => api.post('/subscriptions/create', { plan }),
 };
 
 export default api;

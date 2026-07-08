@@ -10,6 +10,7 @@ interface AuthContextType {
   register: (data: Record<string, string>) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
+  refreshAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,16 +48,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (email: string, password: string) => {
     const res = await authAPI.login({ email, password });
-    const { user: userData, tenant: tenantData } = res.data.data;
-    // Cookie is set automatically by server!
+    const { user: userData, tenant: tenantData, accessToken, refreshToken } = res.data.data;
+    if (accessToken) localStorage.setItem('ems_token', accessToken);
+    if (refreshToken) localStorage.setItem('ems_refresh_token', refreshToken);
     setUser(userData);
     setTenant(tenantData);
   };
 
   const register = async (data: Record<string, string>) => {
     const res = await authAPI.register(data);
-    const { user: userData, tenant: tenantData } = res.data.data;
-    // Cookie is set automatically by server!
+    const { user: userData, tenant: tenantData, accessToken, refreshToken } = res.data.data;
+    if (accessToken) localStorage.setItem('ems_token', accessToken);
+    if (refreshToken) localStorage.setItem('ems_refresh_token', refreshToken);
     setUser(userData);
     setTenant(tenantData);
   };
@@ -67,6 +70,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err) {
       // Ignore errors
     }
+    localStorage.removeItem('ems_token');
+    localStorage.removeItem('ems_refresh_token');
     setUser(null);
     setTenant(null);
   };
@@ -75,8 +80,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(updatedUser);
   };
 
+  const refreshAuth = async () => {
+    try {
+      const res = await authAPI.getMe();
+      setUser(res.data.data.user);
+      setTenant(res.data.data.tenant);
+    } catch (error) {
+      console.error('Failed to refresh auth:', error);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, tenant, loading, login, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, tenant, loading, login, register, logout, updateUser, refreshAuth }}>
       {children}
     </AuthContext.Provider>
   );
