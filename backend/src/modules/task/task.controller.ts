@@ -4,9 +4,10 @@ import { AuthRequest } from '../../middleware/auth';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
+import { resolveTenantScope } from '../../utils/resolveTenantScope';
 
 export const listTasks = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { userId, done, projectId } = req.query as any;
 
   const filter: Record<string, unknown> = { tenantId };
@@ -44,7 +45,7 @@ export const listTasks = asyncHandler(async (req: AuthRequest, res: Response): P
 });
 
 export const createTask = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { title, deadline, userId, projectId } = req.body;
 
   const targetUserId = req.user?.role === 'employee' ? req.user._id : (userId || req.user?._id);
@@ -65,7 +66,7 @@ export const updateTask = asyncHandler(async (req: AuthRequest, res: Response): 
   const { id } = req.params;
   const { title, deadline, done, projectId } = req.body;
 
-  const task = await Task.findOne({ _id: id, tenantId: req.user?.tenantId });
+  const task = await Task.findOne({ _id: id, tenantId: resolveTenantScope(req) });
   if (!task) {
     throw new ApiError(404, 'Task not found');
   }

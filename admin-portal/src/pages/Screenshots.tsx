@@ -1,37 +1,46 @@
 import React, { useEffect, useState } from 'react';
-import { screenshotAPI, employeeAPI, getFullImageUrl } from '../services/api';
-import { Screenshot, Pagination, User } from '../types';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { screenshotAPI } from '../services/api';
+import { Screenshot, Pagination } from '../types';
 import { Camera, X, Trash2, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 
 const Screenshots: React.FC = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
-  const [employees, setEmployees] = useState<User[]>([]);
-  const [selectedUser, setSelectedUser] = useState('');
   const [pagination, setPagination] = useState<Pagination>({ total: 0, page: 1, limit: 20, pages: 0 });
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<Screenshot | null>(null);
   const [filterTag, setFilterTag] = useState('');
 
-  const isAdmin = user?.role === 'company_admin' || user?.role === 'super_admin' || user?.role === 'manager';
+  const isAdmin = user?.role === 'company_admin' || user?.role === 'super_admin';
 
-  const fetchEmployees = async () => {
-    try {
-      const res = await employeeAPI.list({ limit: 100 });
-      setEmployees(res.data.data.employees || []);
-    } catch (e) {
-      console.error(e);
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'timeline') {
+      toast.success('Switched to Timeline View.');
+    } else if (tab === 'filters') {
+      toast.success('Use productivity filters above.');
+    } else if (tab === 'download') {
+      toast.success('Screenshot package download started!');
     }
-  };
+  }, [searchParams]);
 
   const fetchScreenshots = async (page = 1) => {
+    if (user?.role === 'super_admin') {
+      setScreenshots([]);
+      setPagination({ total: 0, page: 1, limit: 20, pages: 0 });
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const params: Record<string, string | number> = { page, limit: 20 };
       if (filterTag) params.productivityTag = filterTag;
-      if (selectedUser) params.userId = selectedUser;
       const res = await screenshotAPI.list(params);
       setScreenshots(res.data.data.screenshots);
       setPagination(res.data.data.pagination);
@@ -43,14 +52,10 @@ const Screenshots: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isAdmin) {
-      fetchEmployees();
+    if (user) {
+      fetchScreenshots();
     }
-  }, [isAdmin]);
-
-  useEffect(() => {
-    fetchScreenshots();
-  }, [filterTag, selectedUser]);
+  }, [user, filterTag]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this screenshot?')) return;
@@ -70,37 +75,20 @@ const Screenshots: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="bg-[#0d1117] min-h-full text-white">
       <Toaster position="top-right" />
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
           <Camera className="w-6 h-6 text-purple-500" /> Screenshots
         </h1>
-        <div className="flex flex-wrap items-center gap-2">
-          {isAdmin && (
-            <select
-              value={selectedUser}
-              onChange={(e) => setSelectedUser(e.target.value)}
-              className="px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-            >
-              <option value="">All Employees</option>
-              {employees.map((emp) => {
-                const empId = emp.id || (emp as any)._id;
-                return (
-                  <option key={empId} value={empId}>
-                    {emp.name}
-                  </option>
-                );
-              })}
-            </select>
-          )}
+        <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-slate-400" />
           <select
             value={filterTag}
             onChange={(e) => setFilterTag(e.target.value)}
-            className="px-3 py-1.5 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            className="px-3 py-1.5 bg-[#161b22] border border-[#30363d] text-white rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
           >
-            <option value="">All Statuses</option>
+            <option value="">All</option>
             <option value="productive">Productive</option>
             <option value="neutral">Neutral</option>
             <option value="unproductive">Unproductive</option>
@@ -113,32 +101,36 @@ const Screenshots: React.FC = () => {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
         </div>
       ) : screenshots.length === 0 ? (
-        <div className="bg-white rounded-xl p-12 text-center shadow-sm border">
-          <Camera className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-          <p className="text-slate-500">No screenshots yet. They'll appear here when the desktop agent captures them.</p>
+        <div className="bg-[#161b22] rounded-xl p-12 text-center border border-[#30363d]">
+          <Camera className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+          <p className="text-slate-400">No screenshots yet. They'll appear here when the desktop agent captures them.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {screenshots.map((ss) => (
             <div
               key={ss._id}
-              className="bg-white rounded-xl shadow-sm border overflow-hidden group hover:shadow-md transition-shadow"
+              className="bg-[#161b22] rounded-xl border border-[#30363d] overflow-hidden group hover:border-[#484f58] transition-colors"
             >
               <div className="relative cursor-pointer" onClick={() => setSelectedImage(ss)}>
                 <img
-                  src={getFullImageUrl(ss.imageUrl)}
+                  src={ss.imageUrl}
                   alt={ss.windowTitle || 'Screenshot'}
                   className="w-full h-44 object-cover"
                 />
                 <div className="absolute top-2 right-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${tagColors[ss.productivityTag] || tagColors.neutral}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    ss.productivityTag === 'productive' ? 'bg-green-500/10 text-green-400' :
+                    ss.productivityTag === 'unproductive' ? 'bg-red-500/10 text-red-400' :
+                    'bg-yellow-500/10 text-yellow-400'
+                  }`}>
                     {ss.productivityTag}
                   </span>
                 </div>
               </div>
               <div className="p-3">
-                <p className="text-sm font-medium text-slate-800 truncate">{ss.activeApp || 'Unknown App'}</p>
-                <p className="text-xs text-slate-500 truncate">{ss.windowTitle || '-'}</p>
+                <p className="text-sm font-medium text-white truncate">{ss.activeApp || 'Unknown App'}</p>
+                <p className="text-xs text-slate-400 truncate">{ss.windowTitle || '-'}</p>
                 <div className="flex justify-between items-center mt-2">
                   <div>
                     <p className="text-xs text-slate-400">
@@ -167,7 +159,7 @@ const Screenshots: React.FC = () => {
           <button
             onClick={() => fetchScreenshots(pagination.page - 1)}
             disabled={pagination.page === 1}
-            className="p-2 rounded border hover:bg-white disabled:opacity-50"
+            className="p-2 border border-[#30363d] rounded-lg disabled:opacity-50 text-slate-300 hover:bg-[#21262d]"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -190,7 +182,7 @@ const Screenshots: React.FC = () => {
             <button onClick={() => setSelectedImage(null)} className="absolute -top-10 right-0 text-white hover:text-slate-300">
               <X className="w-6 h-6" />
             </button>
-            <img src={getFullImageUrl(selectedImage.imageUrl)} alt={selectedImage.windowTitle} className="w-full rounded-lg" />
+            <img src={selectedImage.imageUrl} alt={selectedImage.windowTitle} className="w-full rounded-lg" />
             <div className="bg-white p-4 rounded-b-lg">
               <p className="font-medium">{selectedImage.activeApp || 'Unknown App'}</p>
               <p className="text-sm text-slate-500">{selectedImage.windowTitle}</p>

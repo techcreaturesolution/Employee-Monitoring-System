@@ -4,7 +4,7 @@
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: #f1f5f9;
+  background-color: #020617;
 }
 
 ::-webkit-scrollbar {
@@ -12,10 +12,269 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #0f172a;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #94a3b8;
+  background: #334155;
   border-radius: 3px;
 }
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Theme Overrides for Light Theme
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Page Backgrounds & Text */
+.light-theme body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.light-theme .bg-\[\#0d1117\] {
+  background-color: #f8fafc !important;
+}
+
+.light-theme .bg-\[\#161b22\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+.light-theme .bg-slate-950 {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+.light-theme .bg-\[\#0d1117\]\/50 {
+  background-color: rgba(241, 245, 249, 0.8) !important;
+}
+
+.light-theme .bg-\[\#0d1117\]\/30 {
+  background-color: rgba(241, 245, 249, 0.4) !important;
+}
+
+.light-theme .bg-slate-900 {
+  background-color: #f1f5f9 !important;
+}
+
+.light-theme .bg-slate-50 {
+  background-color: #f8fafc !important;
+}
+
+.light-theme .bg-\[\#21262d\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Borders */
+.light-theme .border-\[\#30363d\] {
+  border-color: #e2e8f0 !important;
+}
+
+.light-theme .border-\[\#21262d\] {
+  border-color: #e2e8f0 !important;
+}
+
+.light-theme .divide-\[\#30363d\] > * {
+  border-color: #e2e8f0 !important;
+}
+
+.light-theme .divide-\[\#21262d\] > * {
+  border-color: #e2e8f0 !important;
+}
+
+/* Texts */
+.light-theme .text-white {
+  color: #0f172a !important;
+}
+
+.light-theme .text-slate-200 {
+  color: #1e293b !important;
+}
+
+.light-theme .text-slate-300 {
+  color: #334155 !important;
+}
+
+.light-theme .text-slate-400 {
+  color: #64748b !important;
+}
+
+.light-theme .text-slate-500 {
+  color: #64748b !important;
+}
+
+.light-theme .text-slate-600 {
+  color: #475569 !important;
+}
+
+/* Header & Sidebar */
+.light-theme header {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+.light-theme header span {
+  color: #0f172a !important;
+}
+
+.light-theme header .text-slate-500 {
+  color: #64748b !important;
+}
+
+.light-theme header .text-slate-200 {
+  color: #1e293b !important;
+}
+
+.light-theme aside {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
+.light-theme aside .text-white {
+  color: #0f172a !important;
+}
+
+.light-theme aside .text-slate-400 {
+  color: #64748b !important;
+}
+
+.light-theme aside .bg-blue-600,
+.light-theme aside .bg-blue-600\/90,
+.light-theme .bg-blue-600,
+.light-theme .bg-blue-600\/90 {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+.light-theme .bg-blue-600 span,
+.light-theme .bg-blue-600\/90 span,
+.light-theme aside .bg-blue-600\/90 span {
+  color: #ffffff !important;
+}
+
+.light-theme .bg-blue-600 svg,
+.light-theme .bg-blue-600\/90 svg,
+.light-theme aside .bg-blue-600\/90 svg {
+  color: #ffffff !important;
+}
+
+/* Controls */
+.light-theme input,
+.light-theme select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.light-theme input::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Hovers */
+.light-theme .hover\:bg-\[\#161b22\]:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.light-theme .hover\:bg-\[\#21262d\]:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.light-theme .hover\:bg-\[\#30363d\]:hover {
+  background-color: #e2e8f0 !important;
+}
+
+.light-theme .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+
+.light-theme .hover\:bg-slate-50:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.light-theme .hover\:bg-slate-50\/50:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Scrollbars overrides */
+.light-theme ::-webkit-scrollbar-track {
+  background: #f1f5f9 !important;
+}
+
+.light-theme ::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important;
+}
+
+.light-theme ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8 !important;
+}
+
+/* Recharts / Chart Overrides */
+.light-theme .recharts-default-tooltip {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.light-theme .recharts-tooltip-label {
+  color: #0f172a !important;
+  font-weight: 600 !important;
+}
+
+.light-theme .recharts-cartesian-grid-horizontal line,
+.light-theme .recharts-cartesian-grid-vertical line {
+  stroke: #e2e8f0 !important;
+}
+
+.light-theme .recharts-text {
+  fill: #64748b !important;
+}
+
+/* Autofill overrides for dark theme layout */
+.bg-slate-950 input:-webkit-autofill,
+.bg-slate-950 input:-webkit-autofill:hover, 
+.bg-slate-950 input:-webkit-autofill:focus, 
+.bg-slate-950 input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #0d1117 inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+/* Autofill overrides for light theme layout */
+.light-theme input:-webkit-autofill,
+.light-theme input:-webkit-autofill:hover, 
+.light-theme input:-webkit-autofill:focus, 
+.light-theme input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+.bg-white input:-webkit-autofill,
+.bg-white input:-webkit-autofill:hover, 
+.bg-white input:-webkit-autofill:focus, 
+.bg-white input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
+  -webkit-text-fill-color: #1e293b !important;
+}
+
+/* Date picker calendar indicator color override for dark theme */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.8;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+/* Light theme revert */
+.light-theme input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0);
+  opacity: 0.6;
+}
+

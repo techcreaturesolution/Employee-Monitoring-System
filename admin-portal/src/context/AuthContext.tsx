@@ -10,7 +10,6 @@ interface AuthContextType {
   register: (data: Record<string, string>) => Promise<void>;
   logout: () => void;
   updateUser: (user: User) => void;
-  refreshAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,77 +20,79 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
     // Check if user is already authenticated
     // Cookie is sent automatically by browser
     authAPI
       .getMe()
-      .then((res) => {
-        if (isMounted) {
-          setUser(res.data.data.user);
-          setTenant(res.data.data.tenant);
+      .then(async (res) => {
+        const userData = res.data.data.user;
+        setUser(userData);
+        setTenant(res.data.data.tenant);
+        localStorage.setItem('ems_user', JSON.stringify(userData));
+
+        // Automatically fetch and populate accessToken in localStorage via refresh-token endpoint
+        try {
+          const refreshRes = await authAPI.refreshToken();
+          const { accessToken } = refreshRes.data.data;
+          if (accessToken) {
+            localStorage.setItem('ems_token', accessToken);
+          }
+        } catch (refreshErr) {
+          console.warn('Auto refresh-token failed on mount:', refreshErr);
         }
       })
-      .catch((error) => {
-        if (isMounted) {
-          console.error('Failed to fetch user:', error);
-        }
+      .catch(() => {
+        // User not authenticated, no action needed
+        // Cookie will be cleared by server on 401
+        localStorage.removeItem('ems_user');
+        localStorage.removeItem('ems_token');
       })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-      
-    return () => {
-      isMounted = false;
-    };
+      .finally(() => setLoading(false));
   }, []);
 
   const login = async (email: string, password: string) => {
     const res = await authAPI.login({ email, password });
-    const { user: userData, tenant: tenantData, accessToken, refreshToken } = res.data.data;
-    if (accessToken) localStorage.setItem('ems_token', accessToken);
-    if (refreshToken) localStorage.setItem('ems_refresh_token', refreshToken);
+    const { user: userData, tenant: tenantData, accessToken } = res.data.data;
+    // Cookie is set automatically by server!
     setUser(userData);
     setTenant(tenantData);
+    localStorage.setItem('ems_user', JSON.stringify(userData));
+    if (accessToken) {
+      localStorage.setItem('ems_token', accessToken);
+    }
   };
 
   const register = async (data: Record<string, string>) => {
     const res = await authAPI.register(data);
-    const { user: userData, tenant: tenantData, accessToken, refreshToken } = res.data.data;
-    if (accessToken) localStorage.setItem('ems_token', accessToken);
-    if (refreshToken) localStorage.setItem('ems_refresh_token', refreshToken);
+    const { user: userData, tenant: tenantData, accessToken } = res.data.data;
+    // Cookie is set automatically by server!
     setUser(userData);
     setTenant(tenantData);
+    localStorage.setItem('ems_user', JSON.stringify(userData));
+    if (accessToken) {
+      localStorage.setItem('ems_token', accessToken);
+    }
   };
 
   const logout = async () => {
     try {
-      await authAPI.logout(); 
+      // In a real app we'd have a logout endpoint to clear the HTTP-only cookie
+      // await authAPI.logout(); 
     } catch (err) {
       // Ignore errors
     }
-    localStorage.removeItem('ems_token');
-    localStorage.removeItem('ems_refresh_token');
     setUser(null);
     setTenant(null);
+    localStorage.removeItem('ems_user');
+    localStorage.removeItem('ems_token');
   };
 
   const updateUser = (updatedUser: User) => {
     setUser(updatedUser);
   };
 
-  const refreshAuth = async () => {
-    try {
-      const res = await authAPI.getMe();
-      setUser(res.data.data.user);
-      setTenant(res.data.data.tenant);
-    } catch (error) {
-      console.error('Failed to refresh auth:', error);
-    }
-  };
-
   return (
-    <AuthContext.Provider value={{ user, tenant, loading, login, register, logout, updateUser, refreshAuth }}>
+    <AuthContext.Provider value={{ user, tenant, loading, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
