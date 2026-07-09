@@ -5,9 +5,10 @@ import { paginate } from '../../utils/helpers';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
+import { resolveTenantScope } from '../../utils/resolveTenantScope';
 
 export const listProjects = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { page = 1, limit = 20, status } = req.query as any;
   const { skip, limit: lim } = paginate(Number(page), Number(limit));
 
@@ -38,7 +39,7 @@ export const listProjects = asyncHandler(async (req: AuthRequest, res: Response)
 });
 
 export const createProject = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { name, description, members } = req.body;
 
   const project = await Project.create({
@@ -54,7 +55,7 @@ export const createProject = asyncHandler(async (req: AuthRequest, res: Response
 
 export const updateProject = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
 
   const allowedUpdates = ['name', 'description', 'members', 'status'];
   const updates: Record<string, any> = {};
@@ -79,7 +80,7 @@ export const updateProject = asyncHandler(async (req: AuthRequest, res: Response
 
 export const getProjectTimeEntries = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
 
   const project = await Project.findOne({ _id: id, tenantId })
     .populate('timeEntries.userId', 'name email')
@@ -94,7 +95,7 @@ export const getProjectTimeEntries = asyncHandler(async (req: AuthRequest, res: 
 
 export const addTimeEntry = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { date, minutes, description } = req.body;
 
   const project = await Project.findOne({ _id: id, tenantId });

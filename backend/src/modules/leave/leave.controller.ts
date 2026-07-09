@@ -5,12 +5,15 @@ import { Attendance } from '../attendance/attendance.model';
 import { User } from '../employee/employee.model';
 import { LeavePolicy } from './leavePolicy.model';
 import { createNotification } from '../../utils/notification';
+import { sendEmail } from '../../services/email.service';
+import { leaveStatusTemplate } from '../../services/emailTemplates';
 import { paginate } from '../../utils/helpers';
 import mongoose from 'mongoose';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { logger } from '../../utils/logger';
+import { resolveTenantScope } from '../../utils/resolveTenantScope';
 
 export const applyLeave = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const user = req.user;
@@ -65,7 +68,7 @@ export const applyLeave = asyncHandler(async (req: AuthRequest, res: Response): 
       title: 'New Leave Application',
       message: `${user.name} applied for ${leaveType} leave from ${startDateStr} to ${endDateStr}.`,
       link: '/leaves',
-    }).catch((err) => logger.error('Failed to notify manager of new leave application:', err));
+    }).catch((err: any) => logger.error('Failed to notify manager of new leave application:', err));
   }
 
   res.status(201).json(new ApiResponse(201, 'Leave application submitted successfully.', leave));
@@ -99,7 +102,7 @@ export const listLeaves = asyncHandler(async (req: AuthRequest, res: Response): 
   if (!user || !user.tenantId) {
     throw new ApiError(401, 'Unauthorized');
   }
-  const tenantId = user.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { page = 1, limit = 20, status, userId } = req.query as any;
   const { skip, limit: lim } = paginate(Number(page), Number(limit));
 
@@ -131,11 +134,11 @@ export const updateLeave = asyncHandler(async (req: AuthRequest, res: Response):
     throw new ApiError(401, 'Unauthorized');
   }
   const { id } = req.params;
-  const tenantId = user.tenantId;
+  const tenantId = resolveTenantScope(req);
   const userId = user._id;
   const userRole = user.role;
 
-  const leave = await Leave.findOne({ _id: id, tenantId });
+  const leave = await Leave.findOne({ _id: id, tenantId }).populate('userId', 'name email');
   if (!leave) {
     throw new ApiError(404, 'Leave request not found.');
   }
@@ -172,11 +175,18 @@ export const updateLeave = asyncHandler(async (req: AuthRequest, res: Response):
     const endDateStr = leave.endDate.toISOString().split('T')[0];
     createNotification(req.app, {
       tenantId: leave.tenantId,
-      userId: leave.userId,
+      userId: leave.userId._id, // User might be populated
       type: 'system',
       title: `Leave Application ${status.toUpperCase()}`,
       message: `Your leave request from ${startDateStr} to ${endDateStr} has been ${status} by ${req.user?.name}.`,
-    }).catch((err) => logger.error('Failed to notify employee of leave status change:', err));
+    }).catch((err: any) => logger.error('Failed to notify employee of leave status change:', err));
+
+    const employee = leave.userId as any;
+    sendEmail({
+      to: employee.email,
+      subject: `Leave Request ${status === 'approved' ? 'Approved' : 'Rejected'}`,
+      html: leaveStatusTemplate(employee.name, status as 'approved' | 'rejected', `${startDateStr} to ${endDateStr}`),
+    }).catch((err: any) => logger.error('Failed to send leave status email:', err));
 
     // If approved, create or update Attendance records
     if (status === 'approved') {
@@ -245,7 +255,7 @@ export const cancelLeave = asyncHandler(async (req: AuthRequest, res: Response):
       type: 'system',
       title: 'Leave Cancelled',
       message: `Your leave request has been cancelled by ${user.name}.`,
-    }).catch((err) => logger.error('Failed to notify employee of leave cancellation:', err));
+    }).catch((err: any) => logger.error('Failed to notify employee of leave cancellation:', err));
   } else if (oldStatus === 'approved') {
     const managers = await User.find({ tenantId: leave.tenantId, role: { $in: ['manager', 'company_admin'] } })
       .lean();
@@ -258,7 +268,7 @@ export const cancelLeave = asyncHandler(async (req: AuthRequest, res: Response):
         message: `${user.name} has cancelled their approved leave starting ${
           leave.startDate.toISOString().split('T')[0]
         }.`,
-      }).catch((err) => logger.error('Failed to notify manager of employee leave cancellation:', err));
+      }).catch((err: any) => logger.error('Failed to notify manager of employee leave cancellation:', err));
     }
   }
 

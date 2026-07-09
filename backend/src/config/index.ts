@@ -61,12 +61,14 @@ export const config = {
     password: process.env.SUPER_ADMIN_PASSWORD!,
   },
   email: {
-    service: process.env.EMAIL_SERVICE || 'resend', // 'resend' | 'smtp'
-    from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+    mode: (process.env.EMAIL_MODE as 'resend' | 'smtp' | 'sandbox') || 'sandbox',
+    fromName: process.env.EMAIL_FROM_NAME || 'EMS',
+    fromAddress: process.env.EMAIL_FROM_ADDRESS || 'onboarding@resend.dev',
     resendApiKey: process.env.RESEND_API_KEY || '',
     smtp: {
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: process.env.SMTP_SECURE === 'true',
       user: process.env.SMTP_USER || '',
       pass: process.env.SMTP_PASS || '',
     },

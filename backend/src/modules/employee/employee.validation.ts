@@ -35,7 +35,7 @@ export const updateEmployeeSchema = Joi.object({
 export const employeeQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(20),
-  status: Joi.string().valid('active', 'inactive').optional(),
-  department: Joi.string().optional(),
-  search: Joi.string().optional(),
+  status: Joi.string().valid('active', 'inactive').allow('').optional(),
+  department: Joi.string().allow('').optional(),
+  search: Joi.string().allow('').optional(),
 });

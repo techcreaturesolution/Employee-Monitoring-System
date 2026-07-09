@@ -11,6 +11,11 @@ export interface ITenant extends Document {
     state: string;
     country: string;
     zipCode: string;
+    formatted?: string;
+  };
+  location?: {
+    type: 'Point';
+    coordinates: [number, number];
   };
   logo: string;
   plan: 'free' | 'starter' | 'business' | 'enterprise';
@@ -56,6 +61,11 @@ const tenantSchema = new Schema<ITenant>(
       state: { type: String, default: '' },
       country: { type: String, default: 'India' },
       zipCode: { type: String, default: '' },
+      formatted: { type: String, default: '' },
+    },
+    location: {
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: { type: [Number], default: [0, 0] },
     },
     logo: { type: String, default: '' },
     plan: {
@@ -100,5 +110,6 @@ const tenantSchema = new Schema<ITenant>(
 );
 
 tenantSchema.index({ status: 1 });
+tenantSchema.index({ location: '2dsphere' });
 
 export const Tenant = mongoose.model<ITenant>('Tenant', tenantSchema);

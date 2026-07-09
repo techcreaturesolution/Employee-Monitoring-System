@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
+import { apiLogger } from './middleware/apiLogger';
 import path from 'path';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
@@ -41,7 +41,7 @@ app.use(
 );
 
 app.use(express.json({
-  limit: '1mb',
+  limit: '10mb',
   verify: (req: any, res, buf) => {
     req.rawBody = buf;
   }
@@ -51,7 +51,7 @@ app.use(cookieParser());
 app.use(sanitizeMongo);
 app.use(preventHpp);
 app.use(sanitizeXss);
-app.use(morgan('dev'));
+app.use(apiLogger);
 app.use(compression());
 
 // CSRF configuration
@@ -66,7 +66,9 @@ app.use((req, res, next) => {
     req.path.startsWith('/api/auth/login') ||
     req.path.startsWith('/api/auth/register') ||
     req.path.startsWith('/api/auth/refresh-token') ||
-    req.method === 'GET';
+    req.path.startsWith('/api/auth/logout') ||
+    req.method === 'GET' ||
+    !!req.headers['x-agent-key'];
   if (skipCsrf) return next();
   return doubleCsrfProtection(req, res, next);
 });

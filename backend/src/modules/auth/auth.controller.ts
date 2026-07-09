@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { User } from '../employee/employee.model';
 import { Tenant } from '../tenant/tenant.model';
 import { Attendance } from '../attendance/attendance.model';
@@ -14,7 +15,7 @@ import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { checkPasswordStrength } from '../../utils/passwordStrength';
 import { sendEmail } from '../../services/email.service';
-import { welcomeEmailTemplate } from '../../services/emailTemplates';
+import { welcomeEmailTemplate, passwordResetTemplate, passwordChangedTemplate } from '../../services/emailTemplates';
 
 interface JwtPayload {
   userId: string;
@@ -78,7 +79,7 @@ export const register = asyncHandler(async (req: Request, res: Response): Promis
     to: user.email,
     subject: 'Welcome to EMS',
     html: welcomeEmailTemplate(user.name, tenant.name),
-  }).catch((err) => logger.error('Failed to send welcome email:', err));
+  }).catch((err: any) => logger.error('Failed to send welcome email:', err));
 
   res.status(201).json(
     new ApiResponse(201, 'Company registered successfully.', {
@@ -416,4 +417,69 @@ export const changePassword = asyncHandler(async (req: AuthRequest, res: Respons
   await user.save();
 
   res.json(new ApiResponse(200, 'Password changed successfully.'));
+});
+
+export const forgotPassword = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { email } = req.body;
+  const user = await User.findOne({ email: email?.toLowerCase() });
+
+  const genericResponse = new ApiResponse(200, 'If an account with that email exists, a password reset link has been sent.', {});
+
+  if (!user) {
+    res.json(genericResponse);
+    return;
+  }
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+  await cache.set(`password_reset:${hashedToken}`, String(user._id), 60 * 60);
+
+  const resetLink = `${config.frontendUrl}/reset-password?token=${rawToken}`;
+  const result = await sendEmail({
+    to: user.email,
+    subject: 'Reset your EMS password',
+    html: passwordResetTemplate(user.name, resetLink),
+  });
+
+  if (config.email.mode === 'sandbox' && result.previewUrl) {
+    res.json(new ApiResponse(200, 'If an account with that email exists, a password reset link has been sent.', { _sandboxPreviewUrl: result.previewUrl }));
+    return;
+  }
+
+  res.json(genericResponse);
+});
+
+export const resetPassword = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { token, newPassword } = req.body;
+
+  const strength = checkPasswordStrength(newPassword, []);
+  if (!strength.isStrong) {
+    throw new ApiError(400, strength.feedback || 'Password is too weak.');
+  }
+
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  const userId = await cache.get(`password_reset:${hashedToken}`);
+
+  if (!userId) {
+    throw new ApiError(400, 'Reset link is invalid or has expired.');
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(404, 'User not found.');
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  await cache.delete(`password_reset:${hashedToken}`);
+
+  sendEmail({
+    to: user.email,
+    subject: 'Your EMS password was changed',
+    html: passwordChangedTemplate(user.name),
+  }).catch(() => {});
+
+  res.json(new ApiResponse(200, 'Password has been reset successfully. You can now log in.', {}));
 });

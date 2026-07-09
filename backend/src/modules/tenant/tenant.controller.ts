@@ -3,11 +3,67 @@ import { Tenant } from './tenant.model';
 import { User } from '../employee/employee.model';
 import { Subscription } from '../subscription/subscription.model';
 import { AuthRequest } from '../../middleware/auth';
-import { paginate } from '../../utils/helpers';
+import { paginate, generateAgentKey } from '../../utils/helpers';
 import { logger } from '../../utils/logger';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
+import { sendEmail } from '../../services/email.service';
+import { employeeInviteTemplate } from '../../services/emailTemplates';
+import { config } from '../../config';
+
+export const createTenant = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+  const { companyName, companyEmail, adminName, phone, plan, status, address, latitude, longitude } = req.body;
+
+  const existing = await Tenant.findOne({ email: companyEmail });
+  if (existing) throw new ApiError(409, 'A company with this email already exists.');
+
+  const tenant = await Tenant.create({
+    name: companyName,
+    email: companyEmail,
+    phone,
+    plan: plan || 'free',
+    status: status || 'trial',
+    address: {
+      street: address?.street || '',
+      city: address?.city || '',
+      state: address?.state || '',
+      country: address?.country || 'India',
+      zipCode: address?.zipCode || '',
+      formatted: address?.formatted || '',
+    },
+    location: { type: 'Point', coordinates: [longitude || 0, latitude || 0] },
+    settings: {
+      officeLocations: [
+        {
+          name: `${companyName} HQ`,
+          latitude: latitude || 0,
+          longitude: longitude || 0,
+          radiusMeters: 150,
+        },
+      ],
+    },
+  });
+
+  const tempPassword = generateAgentKey().slice(0, 10);
+  const admin = await User.create({
+    name: adminName,
+    email: companyEmail,
+    password: tempPassword,
+    role: 'company_admin',
+    tenantId: tenant._id,
+    phone,
+    agentKey: generateAgentKey(),
+  });
+
+  sendEmail({
+    to: admin.email,
+    subject: 'Your EMS company account is ready',
+    html: employeeInviteTemplate(admin.name, tempPassword, `${config.frontendUrl}/login`),
+  }).catch((err) => logger.error('Failed to send welcome email:', err));
+
+  res.status(201).json(new ApiResponse(201, 'Company created.', { tenant, admin: { id: admin._id, email: admin.email } }));
+});
 
 export const listTenants = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { page = 1, limit = 20, status, search } = req.query;

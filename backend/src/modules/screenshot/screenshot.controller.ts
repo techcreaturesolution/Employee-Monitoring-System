@@ -12,6 +12,7 @@ import { uploadToCloudinary, getCloudinaryThumbnail, deleteFromCloudinary, isClo
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
+import { resolveTenantScope } from '../../utils/resolveTenantScope';
 
 // ── Retry helper: exponential backoff ────────────────────────────────────────
 const uploadWithRetry = async (
@@ -38,7 +39,7 @@ const uploadWithRetry = async (
 export const uploadScreenshot = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const requestId = `req_${Date.now()}`;
   const userId = req.user?._id;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const file = req.file;
 
   if (!file) {
@@ -134,7 +135,7 @@ export const uploadScreenshot = asyncHandler(async (req: AuthRequest, res: Respo
 });
 
 export const listScreenshots = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { page = 1, limit = 20, userId, startDate, endDate, productivityTag } = req.query;
   const { skip, limit: lim } = paginate(Number(page), Number(limit));
 
@@ -173,7 +174,7 @@ export const listScreenshots = asyncHandler(async (req: AuthRequest, res: Respon
 
 export const getScreenshot = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
 
   const screenshot = await Screenshot.findOne({ _id: id, tenantId })
     .populate('userId', 'name email employeeId');
@@ -187,7 +188,7 @@ export const getScreenshot = asyncHandler(async (req: AuthRequest, res: Response
 
 export const deleteScreenshot = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
 
   const screenshot = await Screenshot.findOneAndDelete({ _id: id, tenantId });
   if (!screenshot) {
@@ -222,7 +223,7 @@ export const deleteScreenshot = asyncHandler(async (req: AuthRequest, res: Respo
 });
 
 export const getScreenshotTimeline = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { userId, date } = req.query as Record<string, string>;
 
   const targetDate = date ? new Date(date) : new Date();
@@ -259,7 +260,7 @@ export const getScreenshotTimeline = asyncHandler(async (req: AuthRequest, res: 
 });
 
 export const getScreenshotGrid = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { page = 1, limit = 24, userId, date, startDate, endDate, tag } = req.query as Record<string, string>;
   const { skip, limit: lim } = paginate(Number(page), Number(limit));
 
@@ -303,7 +304,7 @@ export const getScreenshotGrid = asyncHandler(async (req: AuthRequest, res: Resp
 
 export const downloadScreenshot = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.query as Record<string, string>;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
 
   if (!id) {
     throw new ApiError(400, 'Screenshot id is required.');
@@ -324,7 +325,7 @@ export const downloadScreenshot = asyncHandler(async (req: AuthRequest, res: Res
 });
 
 export const getScreenshotFilters = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
 
   const [employees, dateRange] = await Promise.all([
     // All employees who have screenshots

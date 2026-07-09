@@ -1,25 +1,84 @@
-export const welcomeEmailTemplate = (name: string, companyName: string): string => `
-  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-    <h2>Welcome to EMS, ${name}!</h2>
-    <p>Your company <strong>${companyName}</strong> has been registered successfully.</p>
-    <p>You can now log in and start tracking your team's attendance and productivity.</p>
-  </div>
+const wrapper = (title: string, bodyHtml: string): string => `
+<!DOCTYPE html>
+<html>
+  <body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:32px 0;">
+      <tr>
+        <td align="center">
+          <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
+            <tr>
+              <td style="background:#4f46e5;padding:20px 32px;">
+                <span style="color:#fff;font-size:20px;font-weight:bold;">EMS</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;color:#1f2937;">
+                <h2 style="margin:0 0 16px;font-size:18px;">${title}</h2>
+                ${bodyHtml}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px;background:#f9fafb;color:#9ca3af;font-size:12px;">
+                This is an automated message from EMS. Please do not reply directly to this email.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
 `;
 
-export const passwordResetTemplate = (name: string, resetLink: string): string => `
-  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-    <h2>Password Reset Request</h2>
-    <p>Hi ${name}, click the link below to reset your password. This link expires in 1 hour.</p>
-    <a href="${resetLink}" style="display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px;">Reset Password</a>
-    <p>If you didn't request this, you can safely ignore this email.</p>
-  </div>
+const button = (url: string, label: string): string => `
+  <a href="${url}" style="display:inline-block;margin-top:20px;padding:12px 24px;background:#4f46e5;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;">
+    ${label}
+  </a>
 `;
 
-export const employeeInviteTemplate = (name: string, tempPassword: string, loginUrl: string): string => `
-  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-    <h2>You've been added to EMS</h2>
-    <p>Hi ${name}, an account has been created for you.</p>
-    <p><strong>Temporary password:</strong> ${tempPassword}</p>
-    <p>Please log in and change your password immediately: <a href="${loginUrl}">${loginUrl}</a></p>
-  </div>
-`;
+export const welcomeEmailTemplate = (name: string, companyName: string): string =>
+  wrapper(
+    `Welcome, ${name}! 👋`,
+    `<p>Your company <strong>${companyName}</strong> has been registered successfully on EMS.</p>
+     <p>You can now log in and start managing your team's attendance, tasks, and productivity.</p>`
+  );
+
+export const passwordResetTemplate = (name: string, resetLink: string): string =>
+  wrapper(
+    `Password Reset Request`,
+    `<p>Hi ${name},</p>
+     <p>We received a request to reset your password. This link expires in <strong>1 hour</strong>.</p>
+     ${button(resetLink, 'Reset Password')}
+     <p style="margin-top:20px;font-size:13px;color:#6b7280;">
+       If you didn't request this, you can safely ignore this email — your password will remain unchanged.
+     </p>`
+  );
+
+export const employeeInviteTemplate = (name: string, tempPassword: string, loginUrl: string): string =>
+  wrapper(
+    `You've been added to EMS`,
+    `<p>Hi ${name},</p>
+     <p>An account has been created for you. Use the temporary password below to log in:</p>
+     <p style="background:#f3f4f6;padding:10px 14px;border-radius:6px;font-family:monospace;font-size:15px;">
+       ${tempPassword}
+     </p>
+     <p>Please change your password immediately after your first login.</p>
+     ${button(loginUrl, 'Log In Now')}`
+  );
+
+export const passwordChangedTemplate = (name: string): string =>
+  wrapper(
+    `Your password was changed`,
+    `<p>Hi ${name}, this is a confirmation that your EMS account password was just changed.</p>
+     <p style="font-size:13px;color:#6b7280;">
+       If you didn't make this change, contact your company admin immediately.
+     </p>`
+  );
+
+export const leaveStatusTemplate = (name: string, status: 'approved' | 'rejected', dates: string, reason?: string): string =>
+  wrapper(
+    `Leave Request ${status === 'approved' ? 'Approved ✅' : 'Rejected ❌'}`,
+    `<p>Hi ${name},</p>
+     <p>Your leave request for <strong>${dates}</strong> has been <strong>${status}</strong>.</p>
+     ${reason ? `<p style="color:#6b7280;font-size:14px;">Reason: ${reason}</p>` : ''}`
+  );

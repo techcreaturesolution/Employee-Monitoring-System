@@ -15,9 +15,10 @@ import { cache } from '../../services/cache';
 import { sendEmail } from '../../services/email.service';
 import { employeeInviteTemplate } from '../../services/emailTemplates';
 import { config } from '../../config';
+import { resolveTenantScope } from '../../utils/resolveTenantScope';
 
 export const listEmployees = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { page = 1, limit = 20, status, department, search } = req.query as any;
   const { skip, limit: lim } = paginate(Number(page), Number(limit));
 
@@ -51,7 +52,7 @@ export const listEmployees = asyncHandler(async (req: AuthRequest, res: Response
 });
 
 export const addEmployee = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { name, email, password, role, department, designation, employeeId, phone } = req.body;
 
   const existing = await User.findOne({ email, tenantId });
@@ -94,14 +95,14 @@ export const addEmployee = asyncHandler(async (req: AuthRequest, res: Response):
     to: employee.email,
     subject: 'You have been added to EMS',
     html: employeeInviteTemplate(employee.name, finalPassword, `${config.frontendUrl}/login`),
-  }).catch((err) => logger.error('Failed to send employee invite email:', err));
+  }).catch((err: any) => logger.error('Failed to send employee invite email:', err));
 
   res.status(201).json(new ApiResponse(201, 'Employee added successfully.', responseData));
 });
 
 export const getEmployee = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
 
   const employee = await User.findOne({ _id: id, tenantId });
   if (!employee) {
@@ -113,7 +114,7 @@ export const getEmployee = asyncHandler(async (req: AuthRequest, res: Response):
 
 export const updateEmployee = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
 
   const allowedUpdates = ['name', 'department', 'designation', 'phone', 'status', 'role', 'employeeId', 'workMode'];
   const updates: Record<string, unknown> = {};
@@ -140,7 +141,7 @@ export const updateEmployee = asyncHandler(async (req: AuthRequest, res: Respons
 
 export const deleteEmployee = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
 
   const employee = await User.findOneAndUpdate(
     { _id: id, tenantId },
@@ -159,7 +160,7 @@ export const deleteEmployee = asyncHandler(async (req: AuthRequest, res: Respons
 
 export const regenerateAgentKey = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const newKey = generateAgentKey();
 
   const employee = await User.findOneAndUpdate(
@@ -179,7 +180,7 @@ export const regenerateAgentKey = asyncHandler(async (req: AuthRequest, res: Res
 
 export const getEmployeeActivity = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { startDate, endDate, date } = req.query as Record<string, string>;
 
   const targetDate = date || startDate || formatDate(new Date());
@@ -232,7 +233,7 @@ export const getEmployeeActivity = asyncHandler(async (req: AuthRequest, res: Re
 });
 
 export const getEmployeeStatistics = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const tenantObjId = new mongoose.Types.ObjectId(String(tenantId));
 
   const now = new Date();

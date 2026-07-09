@@ -5,6 +5,7 @@ import { connectDatabase } from './config/database';
 import { connectRedis } from './services/cache';
 import { logger } from './utils/logger';
 import { config } from './config';
+import { verifyEmailConnection } from './services/email.service';
 
 const httpServer = createServer(app);
 const io = initSocket(httpServer);
@@ -13,6 +14,7 @@ app.set('io', io);
 const startServer = async () => {
   await connectDatabase();
   connectRedis();
+  await verifyEmailConnection();
 
   httpServer.listen(config.port, '0.0.0.0', () => {
     const divider = '─'.repeat(50);

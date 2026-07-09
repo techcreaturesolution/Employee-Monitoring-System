@@ -13,6 +13,7 @@ import {
   isActiveBreak,
 } from '../../utils/helpers';
 import { logger } from '../../utils/logger';
+import { resolveTenantScope } from '../../utils/resolveTenantScope';
 import axios from 'axios';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
@@ -321,7 +322,7 @@ export const getTodayAttendance = asyncHandler(async (req: AuthRequest, res: Res
 });
 
 export const getAttendanceHistory = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { page = 1, limit = 30, startDate, endDate, userId } = req.query as any;
   const { skip, limit: lim } = paginate(Number(page), Number(limit));
 
@@ -379,7 +380,7 @@ export const getAttendanceHistory = asyncHandler(async (req: AuthRequest, res: R
 });
 
 export const getAttendanceReport = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { startDate, endDate } = req.query;
 
   const todayStr = formatDate(new Date());

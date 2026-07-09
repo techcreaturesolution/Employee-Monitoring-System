@@ -7,10 +7,11 @@ import { isInsideGeofence, getMatchedOffice, paginate } from '../../utils/helper
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
+import { resolveTenantScope } from '../../utils/resolveTenantScope';
 
 export const trackLocation = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?._id;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { latitude, longitude, accuracy, address, source, batteryLevel, networkType } = req.body;
 
   if (!latitude || !longitude) {
@@ -58,7 +59,7 @@ export const trackLocation = asyncHandler(async (req: AuthRequest, res: Response
 
 export const batchTrackLocations = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?._id;
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { locations } = req.body;
 
   if (!Array.isArray(locations) || locations.length === 0) {
@@ -106,7 +107,7 @@ export const batchTrackLocations = asyncHandler(async (req: AuthRequest, res: Re
 });
 
 export const getLocationHistory = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { userId, startDate, endDate, page = 1, limit = 50 } = req.query;
   const { skip, limit: lim } = paginate(Number(page), Number(limit));
 
@@ -142,7 +143,7 @@ export const getLocationHistory = asyncHandler(async (req: AuthRequest, res: Res
 });
 
 export const getLiveLocations = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
 
   const tenant = await Tenant.findById(tenantId);
   const officeLocations = tenant?.settings?.officeLocations || [];
@@ -208,7 +209,7 @@ export const getLiveLocations = asyncHandler(async (req: AuthRequest, res: Respo
 });
 
 export const checkGeofence = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { latitude, longitude } = req.body;
 
   if (!latitude || !longitude) {
@@ -233,7 +234,7 @@ export const checkGeofence = asyncHandler(async (req: AuthRequest, res: Response
 });
 
 export const getLocationTrail = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { userId, date } = req.query;
 
   if (!userId || !date) {
@@ -267,7 +268,7 @@ export const getMyCurrentLocation = asyncHandler(async (req: AuthRequest, res: R
 });
 
 export const getLocationDistance = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const { userId, date } = req.query as Record<string, string>;
 
   if (!userId || !date) {
@@ -316,7 +317,7 @@ export const getLocationDistance = asyncHandler(async (req: AuthRequest, res: Re
 });
 
 export const getGeofenceList = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
-  const tenantId = req.user?.tenantId;
+  const tenantId = resolveTenantScope(req);
   const tenant = await Tenant.findById(tenantId, 'settings.officeLocations name');
 
   if (!tenant) {
