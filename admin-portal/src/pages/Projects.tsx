@@ -159,7 +159,7 @@ const Projects: React.FC = () => {
   const handleEditClick = (project: Project) => {
     setEditingProject(project);
     const savedMembers = JSON.parse(localStorage.getItem('ems_project_members') || '{}');
-    const memberIds = project.members?.map(m => typeof m === 'object' ? m._id : m)
+    const memberIds = project.members?.map(m => typeof m === 'object' ? m.id || (m as any)._id : m)
       || savedMembers[project._id]
       || [];
     setEditForm({
