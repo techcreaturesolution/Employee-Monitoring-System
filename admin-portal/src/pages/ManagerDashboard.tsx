@@ -39,6 +39,7 @@ import {
   Line,
   Legend
 } from 'recharts';
+import toast, { Toaster } from 'react-hot-toast';
 
 /* ── Helpers ── */
 const fmtMin = (m: number) => {
@@ -143,7 +144,7 @@ const ManagerDashboard: React.FC = () => {
       setCompletedTasks(completed);
 
       // 4. Productivity and attendance calculations
-      const statsRes = await dashboardAPI.getAdmin();
+      const statsRes = await dashboardAPI.getManager();
       const adminStats = statsRes.data?.data?.stats || statsRes.data?.data;
       if (adminStats) {
         const totalEmp = adminStats.totalEmployees || employees.length || 1;

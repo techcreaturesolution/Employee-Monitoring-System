@@ -128,6 +128,7 @@ export interface DashboardStats {
   todayAbsent: number;
   todayScreenshots: number;
   onlineNow: number;
+  activeProjects?: number;
 }
 
 export interface Pagination {
@@ -184,4 +185,5 @@ export interface LeaveRequest {
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
+  updatedAt?: string;
 }

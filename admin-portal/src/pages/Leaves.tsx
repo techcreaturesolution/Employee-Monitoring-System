@@ -42,7 +42,7 @@ const Leaves: React.FC = () => {
   const [allLeaves, setAllLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [localStatusOverrides, setLocalStatusOverrides] = useState<Record<string, 'approved' | 'rejected'>>({});
+  const [localStatusOverrides, setLocalStatusOverrides] = useState<Record<string, LeaveRequest['status']>>({});
   const [localRemarksOverrides, setLocalRemarksOverrides] = useState<Record<string, string>>({});
   const [localApproverOverrides, setLocalApproverOverrides] = useState<Record<string, { by: string; date: string }>>({});
 
@@ -411,7 +411,7 @@ const Leaves: React.FC = () => {
       department: leave.department || 'Engineering',
       designation: leave.leaveType === 'sick' ? 'Software Engineer' : 'HR Specialist',
       phone: '+91 9988776655',
-      employeeId: leave.userId.startsWith('emp-') ? leave.userId.toUpperCase() : 'EMP-0092',
+      employeeId: typeof leave.userId === 'string' && leave.userId.startsWith('emp-') ? leave.userId.toUpperCase() : 'EMP-0092',
       status: 'active',
       workMode: 'office',
       balances: {
