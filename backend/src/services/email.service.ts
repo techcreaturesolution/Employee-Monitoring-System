@@ -43,7 +43,7 @@ const getSmtpTransport = (): Transporter => {
 let sandboxTransportPromise: Promise<Transporter> | null = null;
 const getSandboxTransport = (): Promise<Transporter> => {
   if (!sandboxTransportPromise) {
-    sandboxTransportPromise = nodemailer.createTestAccount().then((testAccount) => {
+    sandboxTransportPromise = nodemailer.createTestAccount().then((testAccount: any) => {
       logger.info(`📧 Sandbox email account created: ${testAccount.user}`);
       return nodemailer.createTransport({
         host: 'smtp.ethereal.email',
@@ -53,7 +53,7 @@ const getSandboxTransport = (): Promise<Transporter> => {
       });
     });
   }
-  return sandboxTransportPromise;
+  return sandboxTransportPromise!;
 };
 
 export const sendEmail = async ({ to, subject, html, replyTo }: SendEmailOptions): Promise<SendEmailResult> => {
