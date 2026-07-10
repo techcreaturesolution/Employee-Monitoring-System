@@ -63,8 +63,8 @@ export const getProductivityStats = asyncHandler(async (req: AuthRequest, res: R
   const { date, userId } = req.query;
 
   const targetUserId =
-    req.user?.role === 'employee'
-      ? req.user._id.toString()
+    ['employee', 'hr'].includes(req.user?.role || '')
+      ? req.user?._id?.toString()
       : (userId as string) || req.user?._id?.toString() || '';
 
   if (!targetUserId) {
@@ -171,8 +171,8 @@ export const getProductivityRange = asyncHandler(async (req: AuthRequest, res: R
   }
 
   const targetUserId =
-    req.user?.role === 'employee'
-      ? req.user._id.toString()
+    ['employee', 'hr'].includes(req.user?.role || '')
+      ? req.user?._id?.toString()
       : (userId as string) || req.user?._id?.toString() || '';
 
   const start = new Date(startDate as string);
@@ -227,10 +227,6 @@ export const getProductivityRange = asyncHandler(async (req: AuthRequest, res: R
 export const listKeywords = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const tenantId = req.user?.tenantId;
   const { category } = req.query;
-
-  if (!['admin', 'manager', 'company_admin', 'super_admin'].includes(req.user?.role || '')) {
-    throw new ApiError(403, 'Forbidden: admin access required');
-  }
 
   const filter: Record<string, unknown> = { tenantId };
   if (category) filter.category = category;
@@ -312,8 +308,8 @@ export const deleteKeyword = asyncHandler(async (req: AuthRequest, res: Response
 export const getProductivityOverview = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const tenantId = req.user?.tenantId?.toString() || '';
   const targetUserId =
-    req.user?.role === 'employee'
-      ? req.user._id.toString()
+    ['employee', 'hr'].includes(req.user?.role || '')
+      ? req.user?._id?.toString()
       : (req.query.userId as string) || req.user?._id?.toString() || '';
 
   const today = new Date();
@@ -385,6 +381,10 @@ export const getEmployeeProductivity = asyncHandler(async (req: AuthRequest, res
   const { id } = req.params;
   const tenantId = req.user?.tenantId?.toString() || '';
   const { startDate, endDate, date } = req.query as Record<string, string>;
+
+  if (['employee', 'hr'].includes(req.user?.role || '') && req.user?._id?.toString() !== id) {
+    throw new ApiError(403, 'Forbidden: Cannot access other users data');
+  }
 
   const queryDate = date ? new Date(date) : new Date();
   const start = startDate ? new Date(startDate) : new Date(queryDate.getFullYear(), queryDate.getMonth(), 1);

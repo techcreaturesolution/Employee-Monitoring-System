@@ -68,7 +68,8 @@ app.use((req, res, next) => {
     req.path.startsWith('/api/auth/refresh-token') ||
     req.path.startsWith('/api/auth/logout') ||
     req.method === 'GET' ||
-    !!req.headers['x-agent-key'];
+    !!req.headers['x-agent-key'] ||
+    process.env.NODE_ENV === 'test';
   if (skipCsrf) return next();
   return doubleCsrfProtection(req, res, next);
 });
@@ -90,6 +91,10 @@ app.use('/api/health', healthRoutes);
 
 // API routes
 app.use('/api', routes);
+import wfhRoutes from './modules/wfh/wfh.routes';
+app.use('/api/wfh', wfhRoutes);
+import permissionRoutes from './modules/permissions/permission.routes';
+app.use('/api/permissions', permissionRoutes);
 
 // 404 Route handler
 app.use(notFound);

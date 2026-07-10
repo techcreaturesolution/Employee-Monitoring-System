@@ -15,11 +15,18 @@ const seed = async () => {
       process.exit(0);
     }
 
+    // Cleanup orphaned records from previous partial seeds
+    await Tenant.deleteMany({ email: { $in: [config.superAdmin.email, config.demo.tenantEmail] } });
+    await User.deleteMany({ email: config.demo.adminEmail });
+    // Also cleanup demo employees
+    await User.deleteMany({ email: { $regex: `@${config.demo.employeeEmailDomain}$` } });
+
     const platformTenant = await Tenant.create({
       name: 'EMS Platform',
       email: config.superAdmin.email,
       plan: 'enterprise',
       status: 'active',
+      isEmailVerified: true,
       settings: {
         screenshotInterval: 5,
         trackApps: true,
@@ -43,6 +50,7 @@ const seed = async () => {
       tenantId: platformTenant._id,
       agentKey: generateAgentKey(),
       status: 'active',
+      isEmailVerified: true,
     });
 
     console.log('Seed completed!');
@@ -50,20 +58,22 @@ const seed = async () => {
     console.log(`Tenant: ${platformTenant.name}`);
 
     const demoTenant = await Tenant.create({
-      name: 'Demo Company Pvt Ltd',
-      email: 'demo@democompany.com',
-      phone: '+91 9876543210',
+      name: config.demo.tenantName,
+      email: config.demo.tenantEmail,
+      phone: config.demo.tenantPhone,
       plan: 'starter',
       status: 'active',
+      isEmailVerified: true,
     });
 
     const demoAdmin = await User.create({
-      name: 'Demo Admin',
-      email: 'admin@democompany.com',
-      password: 'Demo@123456',
+      name: config.demo.adminName,
+      email: config.demo.adminEmail,
+      password: config.demo.adminPassword,
       role: 'company_admin',
       tenantId: demoTenant._id,
       agentKey: generateAgentKey(),
+      isEmailVerified: true,
     });
 
     const departments = ['Engineering', 'Design', 'Marketing', 'Sales', 'HR'];
@@ -73,14 +83,15 @@ const seed = async () => {
       employees.push(
         await User.create({
           name: `Employee ${i}`,
-          email: `emp${i}@democompany.com`,
-          password: 'Emp@123456',
+          email: `${config.demo.employeeEmailPrefix}${i}@${config.demo.employeeEmailDomain}`,
+          password: config.demo.employeePassword,
           role: 'employee',
           tenantId: demoTenant._id,
           department: departments[i - 1],
           designation: `${departments[i - 1]} Associate`,
           employeeId: `EMP-${String(i).padStart(4, '0')}`,
           agentKey: generateAgentKey(),
+          isEmailVerified: true,
         })
       );
     }

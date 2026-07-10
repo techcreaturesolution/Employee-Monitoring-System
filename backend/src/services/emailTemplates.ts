@@ -43,6 +43,14 @@ export const welcomeEmailTemplate = (name: string, companyName: string): string 
      <p>You can now log in and start managing your team's attendance, tasks, and productivity.</p>`
   );
 
+export const verificationEmailTemplate = (name: string, verifyLink: string): string =>
+  wrapper(
+    `Verify Your Email`,
+    `<p>Hi ${name},</p>
+     <p>Please verify your email address to access your EMS account.</p>
+     ${button(verifyLink, 'Verify Email')}`
+  );
+
 export const passwordResetTemplate = (name: string, resetLink: string): string =>
   wrapper(
     `Password Reset Request`,
@@ -54,7 +62,7 @@ export const passwordResetTemplate = (name: string, resetLink: string): string =
      </p>`
   );
 
-export const employeeInviteTemplate = (name: string, tempPassword: string, loginUrl: string): string =>
+export const employeeInviteTemplate = (name: string, tempPassword: string, verifyLink: string): string =>
   wrapper(
     `You've been added to EMS`,
     `<p>Hi ${name},</p>
@@ -62,8 +70,8 @@ export const employeeInviteTemplate = (name: string, tempPassword: string, login
      <p style="background:#f3f4f6;padding:10px 14px;border-radius:6px;font-family:monospace;font-size:15px;">
        ${tempPassword}
      </p>
-     <p>Please change your password immediately after your first login.</p>
-     ${button(loginUrl, 'Log In Now')}`
+     <p>Please verify your email and change your password immediately after your first login.</p>
+     ${button(verifyLink, 'Verify Email & Log In')}`
   );
 
 export const passwordChangedTemplate = (name: string): string =>
@@ -81,4 +89,55 @@ export const leaveStatusTemplate = (name: string, status: 'approved' | 'rejected
     `<p>Hi ${name},</p>
      <p>Your leave request for <strong>${dates}</strong> has been <strong>${status}</strong>.</p>
      ${reason ? `<p style="color:#6b7280;font-size:14px;">Reason: ${reason}</p>` : ''}`
+  );
+
+export const emailChangeVerificationTemplate = (name: string, verifyLink: string): string =>
+  wrapper(
+    `Confirm your new email address`,
+    `<p>Hi ${name},</p>
+     <p>We received a request to change your email address for EMS.</p>
+     <p>Please click the button below to confirm this change:</p>
+     ${button(verifyLink, 'Confirm New Email')}
+     <p style="margin-top:20px;font-size:13px;color:#6b7280;">
+       If you did not request this change, you can safely ignore this email.
+     </p>`
+  );
+
+export const oldEmailSecurityAlertTemplate = (name: string): string =>
+  wrapper(
+    `Security Alert: Email Change Requested`,
+    `<p>Hi ${name},</p>
+     <p>A request was made to change the email address associated with your EMS account.</p>
+     <p>If this was you, no further action is needed.</p>
+     <p style="margin-top:20px;font-size:13px;color:#ef4444;">
+       <strong>If this wasn't you, please contact support immediately as your account may be compromised.</strong>
+     </p>`
+  );
+
+export const profileUpdatedTemplate = (name: string, changedFields: string[]): string =>
+  wrapper(
+    `Your EMS profile was updated`,
+    `<p>Hi ${name},</p>
+     <p>Your EMS profile details were recently updated.</p>
+     <p><strong>Fields updated:</strong></p>
+     <ul>
+       ${changedFields.map(field => `<li>${field}</li>`).join('')}
+     </ul>
+     <p style="margin-top:20px;font-size:13px;color:#6b7280;">
+       If this wasn't you, contact your company admin immediately.
+     </p>`
+  );
+
+export const companyUpdatedTemplate = (companyName: string, changedFields: string[]): string =>
+  wrapper(
+    `Your company details were updated`,
+    `<p>Hello,</p>
+     <p>The company details for <strong>${companyName}</strong> were recently updated.</p>
+     <p><strong>Fields updated:</strong></p>
+     <ul>
+       ${changedFields.map(field => `<li>${field}</li>`).join('')}
+     </ul>
+     <p style="margin-top:20px;font-size:13px;color:#6b7280;">
+       If this wasn't authorized, please check your admin logs or contact support.
+     </p>`
   );

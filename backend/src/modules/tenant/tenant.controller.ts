@@ -8,8 +8,9 @@ import { logger } from '../../utils/logger';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
+import crypto from 'crypto';
 import { sendEmail } from '../../services/email.service';
-import { employeeInviteTemplate } from '../../services/emailTemplates';
+import { employeeInviteTemplate, emailChangeVerificationTemplate, oldEmailSecurityAlertTemplate, companyUpdatedTemplate } from '../../services/emailTemplates';
 import { config } from '../../config';
 
 export const createTenant = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
@@ -120,15 +121,59 @@ export const getTenant = asyncHandler(async (req: AuthRequest, res: Response): P
 
 export const updateTenant = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const { id } = req.params;
+
+  const existingTenant = await Tenant.findById(id);
+  if (!existingTenant) {
+    throw new ApiError(404, 'Tenant not found.');
+  }
+
   const allowedUpdates = ['name', 'status', 'plan', 'phone', 'domain'];
   const updates: Record<string, unknown> = {};
+  const changedFields: string[] = [];
+
   for (const key of allowedUpdates) {
-    if (req.body[key] !== undefined) updates[key] = req.body[key];
+    if (req.body[key] !== undefined && req.body[key] !== (existingTenant as any)[key]) {
+      updates[key] = req.body[key];
+      changedFields.push(key);
+    }
+  }
+
+  if (req.body.email && req.body.email !== existingTenant.email) {
+    const emailExists = await Tenant.findOne({ email: req.body.email });
+    if (emailExists) {
+      throw new ApiError(409, 'Email is already in use by another company.');
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    
+    updates['pendingEmail'] = req.body.email;
+    updates['emailVerificationTokenHash'] = hashedToken;
+    updates['emailVerificationExpiry'] = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const verifyLink = `${config.frontendUrl}/verify-email-change?token=${rawToken}`;
+    
+    sendEmail({
+      to: req.body.email,
+      subject: 'Confirm your new email address',
+      html: emailChangeVerificationTemplate(existingTenant.name, verifyLink),
+    }).catch(err => logger.error('Failed to send email change verification:', err));
+
+    sendEmail({
+      to: existingTenant.email,
+      subject: 'Security Alert: Email Change Requested',
+      html: oldEmailSecurityAlertTemplate(existingTenant.name),
+    }).catch(err => logger.error('Failed to send old email security alert:', err));
   }
 
   const tenant = await Tenant.findByIdAndUpdate(id, updates, { new: true });
-  if (!tenant) {
-    throw new ApiError(404, 'Tenant not found.');
+
+  if (changedFields.length > 0 && tenant) {
+    sendEmail({
+      to: tenant.email,
+      subject: 'Your company details were updated',
+      html: companyUpdatedTemplate(tenant.name, changedFields),
+    }).catch(err => logger.error('Failed to send company-update email:', err));
   }
 
   res.json(new ApiResponse(200, 'Tenant updated.', tenant));

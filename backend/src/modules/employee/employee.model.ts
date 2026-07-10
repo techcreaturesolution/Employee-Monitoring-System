@@ -5,10 +5,11 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password: string;
-  role: 'super_admin' | 'company_admin' | 'manager' | 'employee';
+  role: 'super_admin' | 'company_admin' | 'manager' | 'employee' | 'hr';
   tenantId: mongoose.Types.ObjectId;
   department: string;
   designation: string;
+  managerId?: mongoose.Types.ObjectId;
   employeeId: string;
   avatar: string;
   phone: string;
@@ -34,6 +35,10 @@ export interface IUser extends Document {
     address: string;
     updatedAt: Date;
   };
+  isEmailVerified: boolean;
+  emailVerificationTokenHash?: string;
+  emailVerificationExpiry?: Date;
+  pendingEmail?: string;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -47,12 +52,13 @@ const userSchema = new Schema<IUser>(
     password:   { type: String, required: true, select: false },
     role: {
       type: String,
-      enum: ['super_admin', 'company_admin', 'manager', 'employee'],
+      enum: ['super_admin', 'company_admin', 'manager', 'employee', 'hr'],
       default: 'employee',
     },
     tenantId:   { type: Schema.Types.ObjectId, ref: 'Tenant' },
     department: { type: String, default: '' },
     designation:{ type: String, default: '' },
+    managerId:  { type: Schema.Types.ObjectId, ref: 'User' },
     employeeId: { type: String, default: '' },
     avatar:     { type: String, default: '' },
     phone:      { type: String, default: '' },
@@ -86,6 +92,10 @@ const userSchema = new Schema<IUser>(
       address:   { type: String, default: '' },
       updatedAt: { type: Date },
     },
+    isEmailVerified: { type: Boolean, default: false },
+    emailVerificationTokenHash: { type: String, select: false },
+    emailVerificationExpiry: { type: Date, select: false },
+    pendingEmail: { type: String, select: false },
   },
   {
     timestamps: true,

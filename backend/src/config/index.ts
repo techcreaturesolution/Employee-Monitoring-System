@@ -61,7 +61,6 @@ export const config = {
     password: process.env.SUPER_ADMIN_PASSWORD!,
   },
   email: {
-    mode: (process.env.EMAIL_MODE as 'resend' | 'smtp' | 'sandbox') || 'sandbox',
     fromName: process.env.EMAIL_FROM_NAME || 'EMS',
     fromAddress: process.env.EMAIL_FROM_ADDRESS || 'onboarding@resend.dev',
     resendApiKey: process.env.RESEND_API_KEY || '',
@@ -72,6 +71,17 @@ export const config = {
       user: process.env.SMTP_USER || '',
       pass: process.env.SMTP_PASS || '',
     },
+  },
+  demo: {
+    tenantName: process.env.DEMO_TENANT_NAME || 'Demo Company Pvt Ltd',
+    tenantEmail: process.env.DEMO_TENANT_EMAIL || 'demo@democompany.com',
+    tenantPhone: process.env.DEMO_TENANT_PHONE || '+91 9876543210',
+    adminName: process.env.DEMO_ADMIN_NAME || 'Demo Admin',
+    adminEmail: process.env.DEMO_ADMIN_EMAIL || 'admin@democompany.com',
+    adminPassword: process.env.DEMO_ADMIN_PASSWORD || 'Demo@123456',
+    employeePassword: process.env.DEMO_EMPLOYEE_PASSWORD || 'Emp@123456',
+    employeeEmailPrefix: process.env.DEMO_EMPLOYEE_EMAIL_PREFIX || 'emp',
+    employeeEmailDomain: process.env.DEMO_EMPLOYEE_EMAIL_DOMAIN || 'democompany.com',
   },
 } as const;
 

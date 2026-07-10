@@ -1,0 +1,1037 @@
+{
+  "activity": {
+    "routes": [
+      {
+        "method": "post",
+        "path": "/log",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/summary",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/keyboard",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/mouse",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/idle",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/timeline",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/productivity",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/apps",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/websites",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      }
+    ]
+  },
+  "agent": {
+    "routes": [
+      {
+        "method": "post",
+        "path": "/heartbeat",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/screenshot",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/activity",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/punch-in",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/punch-out",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/sync",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/config",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/status",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      }
+    ]
+  },
+  "attendance": {
+    "routes": [
+      {
+        "method": "post",
+        "path": "/punch-in",
+        "roles": "Any Authenticated / Public",
+        "schema": "punchInSchema"
+      },
+      {
+        "method": "post",
+        "path": "/punch-out",
+        "roles": "Any Authenticated / Public",
+        "schema": "punchOutSchema"
+      },
+      {
+        "method": "post",
+        "path": "/break/start",
+        "roles": "Any Authenticated / Public",
+        "schema": "startBreakSchema"
+      },
+      {
+        "method": "post",
+        "path": "/break/end",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/today",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/history",
+        "roles": "Any Authenticated / Public",
+        "schema": "attendanceQuerySchema"
+      },
+      {
+        "method": "get",
+        "path": "/report",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": ""
+      }
+    ],
+    "validations": [
+      "export const punchInSchema = Joi.object({\n  ip: Joi.string().ip({ version: ['ipv4', 'ipv6'] }).optional().allow(''),\n  location: Joi.object({\n    latitude: Joi.number().min(-90).max(90).required(),\n    longitude: Joi.number().min(-180).max(180).required(),\n    address: Joi.string().max(500).allow('').optional(),\n    accuracy: Joi.number().min(0).optional(),\n  }).optional(),\n  screenshotUrl: Joi.string().uri().allow('').optional(),\n  method: Joi.string().valid('web', 'agent', 'mobile').optional(),\n  workMode: Joi.string().valid('office', 'remote', 'hybrid').optional(),\n});",
+      "export const punchOutSchema = Joi.object({\n  location: Joi.object({\n    latitude: Joi.number().min(-90).max(90).required(),\n    longitude: Joi.number().min(-180).max(180).required(),\n    address: Joi.string().max(500).allow('').optional(),\n    accuracy: Joi.number().min(0).optional(),\n  }).optional(),\n});",
+      "export const startBreakSchema = Joi.object({\n  reason: Joi.string().max(250).allow('').optional(),\n});",
+      "export const attendanceQuerySchema = Joi.object({\n  page: Joi.number().integer().min(1).default(1),\n  limit: Joi.number().integer().min(1).max(100).default(30),\n  startDate: Joi.date().iso().optional(),\n  endDate: Joi.date().iso().optional(),\n  userId: Joi.string().hex().length(24).optional(),\n});"
+    ]
+  },
+  "audit": {
+    "routes": [
+      {
+        "method": "get",
+        "path": "/",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": ""
+      }
+    ]
+  },
+  "auth": {
+    "routes": [
+      {
+        "method": "post",
+        "path": "/register",
+        "roles": "Any Authenticated / Public",
+        "schema": "registerSchema"
+      },
+      {
+        "method": "post",
+        "path": "/login",
+        "roles": "Any Authenticated / Public",
+        "schema": "loginSchema"
+      },
+      {
+        "method": "get",
+        "path": "/me",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "put",
+        "path": "/profile",
+        "roles": "Any Authenticated / Public",
+        "schema": "updateProfileSchema"
+      },
+      {
+        "method": "put",
+        "path": "/change-password",
+        "roles": "Any Authenticated / Public",
+        "schema": "changePasswordSchema"
+      },
+      {
+        "method": "post",
+        "path": "/avatar",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/logout",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/refresh-token",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/forgot-password",
+        "roles": "Any Authenticated / Public",
+        "schema": "forgotPasswordSchema"
+      },
+      {
+        "method": "post",
+        "path": "/reset-password",
+        "roles": "Any Authenticated / Public",
+        "schema": "resetPasswordSchema"
+      }
+    ],
+    "validations": [
+      "export const registerSchema = Joi.object({\n  name: Joi.string().min(2).max(100).required(),\n  companyName: Joi.string().min(2).max(150).required(),\n  email: Joi.string().email().required(),\n  password: passwordSchema.required(),\n  phone: Joi.string().pattern(/^\\+?[0-9]{10,14}$/).optional().messages({\n    'string.pattern.base': 'Invalid phone number format',\n  }),\n});",
+      "export const loginSchema = Joi.object({\n  email: Joi.string().email().required(),\n  password: Joi.string().min(1).required(),\n  deviceId: Joi.string().optional(),\n});",
+      "export const updateProfileSchema = Joi.object({\n  name: Joi.string().min(1).max(100).trim().optional(),\n  phone: Joi.string().max(20).trim().allow('').optional(),\n  avatar: Joi.string().uri().max(500).allow('').optional(),\n  department: Joi.string().max(100).trim().allow('').optional(),\n  designation: Joi.string().max(100).trim().allow('').optional(),\n  preferences: Joi.object({\n    theme: Joi.string().valid('light', 'dark', 'system').optional(),\n    language: Joi.string().optional(),\n    notifyEmail: Joi.boolean().optional(),\n    notifyPush: Joi.boolean().optional(),\n    privacyShareLocation: Joi.boolean().optional(),\n  }).optional(),\n});",
+      "export const changePasswordSchema = Joi.object({\n  currentPassword: Joi.string().min(1).required(),\n  newPassword: passwordSchema.required(),\n});",
+      "export const forgotPasswordSchema = Joi.object({\n  email: Joi.string().email().required(),\n});",
+      "export const resetPasswordSchema = Joi.object({\n  token: Joi.string().required(),\n  newPassword: passwordSchema.required(),\n});"
+    ]
+  },
+  "company": {
+    "routes": [
+      {
+        "method": "get",
+        "path": "/analytics",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": ""
+      }
+    ]
+  },
+  "department": {
+    "routes": [
+      {
+        "method": "get",
+        "path": "/",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": "createDepartmentSchema"
+      },
+      {
+        "method": "put",
+        "path": "/:id",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": "updateDepartmentSchema"
+      },
+      {
+        "method": "delete",
+        "path": "/:id",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": ""
+      }
+    ],
+    "validations": [
+      "export const createDepartmentSchema = Joi.object({\n  name: Joi.string().min(2).max(100).required(),\n  managerId: Joi.string().hex().length(24).optional(),\n  description: Joi.string().max(500).allow('').optional(),\n});",
+      "export const updateDepartmentSchema = Joi.object({\n  name: Joi.string().min(2).max(100).optional(),\n  managerId: Joi.string().hex().length(24).allow(null).optional(),\n  description: Joi.string().max(500).allow('').optional(),\n});"
+    ]
+  },
+  "employee": {
+    "routes": [
+      {
+        "method": "get",
+        "path": "",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": "employeeQuerySchema"
+      },
+      {
+        "method": "post",
+        "path": "",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": "addEmployeeSchema"
+      },
+      {
+        "method": "get",
+        "path": "/:id",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "put",
+        "path": "",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": "updateEmployeeSchema"
+      },
+      {
+        "method": "delete",
+        "path": "/:id",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/:id/regenerate-key",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/view/statistics",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/:id/activity",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": ""
+      }
+    ],
+    "validations": [
+      "export const addEmployeeSchema = Joi.object({\n  name: Joi.string().min(2).max(50).required(),\n  email: Joi.string().email().required(),\n  password: passwordSchema.optional(),\n  role: Joi.string().valid('employee', 'manager', 'company_admin').optional(),\n  department: Joi.string().max(100).allow('').optional(),\n  designation: Joi.string().max(100).allow('').optional(),\n  employeeId: Joi.string().max(50).allow('').optional(),\n  phone: Joi.string().max(20).allow('').optional(),\n});",
+      "export const updateEmployeeSchema = Joi.object({\n  name: Joi.string().min(2).max(50).optional(),\n  role: Joi.string().valid('employee', 'manager', 'company_admin').optional(),\n  department: Joi.string().max(100).allow('').optional(),\n  designation: Joi.string().max(100).allow('').optional(),\n  employeeId: Joi.string().max(50).allow('').optional(),\n  phone: Joi.string().max(20).allow('').optional(),\n  status: Joi.string().valid('active', 'inactive').optional(),\n  workMode: Joi.string().valid('office', 'remote', 'hybrid').optional(),\n});",
+      "export const employeeQuerySchema = Joi.object({\n  page: Joi.number().integer().min(1).default(1),\n  limit: Joi.number().integer().min(1).max(100).default(20),\n  status: Joi.string().valid('active', 'inactive').allow('').optional(),\n  department: Joi.string().allow('').optional(),\n  search: Joi.string().allow('').optional(),\n});"
+    ]
+  },
+  "health": {
+    "routes": [
+      {
+        "method": "get",
+        "path": "/",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      }
+    ]
+  },
+  "leave": {
+    "routes": [
+      {
+        "method": "post",
+        "path": "/",
+        "roles": "Any Authenticated / Public",
+        "schema": "applyLeaveSchema"
+      },
+      {
+        "method": "get",
+        "path": "/my",
+        "roles": "Any Authenticated / Public",
+        "schema": "leaveQuerySchema"
+      },
+      {
+        "method": "get",
+        "path": "/",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": "leaveQuerySchema"
+      },
+      {
+        "method": "put",
+        "path": "/:id",
+        "roles": "Any Authenticated / Public",
+        "schema": "updateLeaveSchema"
+      },
+      {
+        "method": "delete",
+        "path": "/:id",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      }
+    ],
+    "validations": [
+      "export const applyLeaveSchema = Joi.object({\n  leaveType: Joi.string().valid('casual', 'sick', 'paid').required(),\n  startDate: Joi.date().iso().required(),\n  endDate: Joi.date().iso().min(Joi.ref('startDate')).required(),\n  reason: Joi.string().min(5).max(1000).required(),\n});",
+      "export const updateLeaveSchema = Joi.object({\n  leaveType: Joi.string().valid('casual', 'sick', 'paid').optional(),\n  startDate: Joi.date().iso().optional(),\n  endDate: Joi.date().iso().min(Joi.ref('startDate')).optional(),\n  reason: Joi.string().min(5).max(1000).optional(),\n  status: Joi.string().valid('approved', 'rejected', 'cancelled', 'pending').optional(),\n});",
+      "export const leaveQuerySchema = Joi.object({\n  page: Joi.number().integer().min(1).default(1),\n  limit: Joi.number().integer().min(1).max(100).default(20),\n  status: Joi.string().valid('approved', 'rejected', 'cancelled', 'pending').optional(),\n  userId: Joi.string().hex().length(24).optional(),\n});"
+    ]
+  },
+  "location": {
+    "routes": [
+      {
+        "method": "post",
+        "path": "/track",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/update",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/batch",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/geofence-check",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/history",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/current",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/live",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/trail",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/distance",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/geofence",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": ""
+      }
+    ]
+  },
+  "manager": {
+    "routes": [
+      {
+        "method": "get",
+        "path": "/",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/assign-team",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/dashboard",
+        "roles": [
+          "company_admin",
+          "super_admin",
+          "manager"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/team/:id",
+        "roles": [
+          "company_admin",
+          "super_admin",
+          "manager"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/:id",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "put",
+        "path": "/:id",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "delete",
+        "path": "/:id",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": ""
+      }
+    ]
+  },
+  "mobile": {
+    "routes": [
+      {
+        "method": "post",
+        "path": "/login",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/punch-in",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/punch-out",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "put",
+        "path": "/work-mode",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/config",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/dashboard",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/location/track",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/location/batch",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/location/geofence-check",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      }
+    ]
+  },
+  "notification": {
+    "routes": [
+      {
+        "method": "get",
+        "path": "/",
+        "roles": "Any Authenticated / Public",
+        "schema": "notificationQuerySchema"
+      },
+      {
+        "method": "post",
+        "path": "/",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": "createNotificationSchema"
+      },
+      {
+        "method": "put",
+        "path": "/read-all",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "put",
+        "path": "/:id/read",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "delete",
+        "path": "/:id",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      }
+    ],
+    "validations": [
+      "export const createNotificationSchema = Joi.object({\n  userId: Joi.string().hex().length(24).required(),\n  title: Joi.string().min(2).max(150).required(),\n  message: Joi.string().min(2).max(1000).required(),\n  type: Joi.string().valid('system', 'attendance', 'activity', 'performance').optional(),\n  link: Joi.string().max(250).allow('').optional(),\n});",
+      "export const notificationQuerySchema = Joi.object({\n  page: Joi.number().integer().min(1).default(1),\n  limit: Joi.number().integer().min(1).max(100).default(20),\n});"
+    ]
+  },
+  "productivity": {
+    "routes": [
+      {
+        "method": "get",
+        "path": "/stats",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/range",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/summary",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/employee/:id",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/keywords",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/keywords",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "put",
+        "path": "/keywords/:id",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "delete",
+        "path": "/keywords/:id",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      }
+    ]
+  },
+  "project": {
+    "routes": [
+      {
+        "method": "get",
+        "path": "/",
+        "roles": "Any Authenticated / Public",
+        "schema": "projectQuerySchema"
+      },
+      {
+        "method": "post",
+        "path": "/",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": "createProjectSchema"
+      },
+      {
+        "method": "put",
+        "path": "/:id",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": "updateProjectSchema"
+      },
+      {
+        "method": "get",
+        "path": "/:id/time-entries",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/:id/time-entries",
+        "roles": "Any Authenticated / Public",
+        "schema": "addTimeEntrySchema"
+      }
+    ],
+    "validations": [
+      "export const createProjectSchema = Joi.object({\n  name: Joi.string().min(2).max(100).required(),\n  description: Joi.string().max(1000).allow('').optional(),\n  members: Joi.array().items(Joi.string().hex().length(24)).optional(),\n});",
+      "export const updateProjectSchema = Joi.object({\n  name: Joi.string().min(2).max(100).optional(),\n  description: Joi.string().max(1000).allow('').optional(),\n  members: Joi.array().items(Joi.string().hex().length(24)).optional(),\n  status: Joi.string().valid('active', 'completed', 'on_hold').optional(),\n});",
+      "export const addTimeEntrySchema = Joi.object({\n  description: Joi.string().min(2).max(500).required(),\n  minutes: Joi.number().integer().min(1).required(),\n  date: Joi.date().iso().default(() => new Date()),\n});",
+      "export const projectQuerySchema = Joi.object({\n  page: Joi.number().integer().min(1).default(1),\n  limit: Joi.number().integer().min(1).max(100).default(20),\n  status: Joi.string().valid('active', 'completed', 'on_hold').optional(),\n});"
+    ]
+  },
+  "report": {
+    "routes": [
+      {
+        "method": "get",
+        "path": "/attendance",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/productivity",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/activity",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/screenshots",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/export/excel",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/export/pdf",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/employee",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/project",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/task",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      }
+    ]
+  },
+  "screenshot": {
+    "routes": [
+      {
+        "method": "post",
+        "path": "/upload",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/:id",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "delete",
+        "path": "/:id",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/view/timeline",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/view/grid",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/view/download",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/view/filters",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      }
+    ]
+  },
+  "settings": {
+    "routes": [
+      {
+        "method": "get",
+        "path": "/",
+        "roles": [
+          "company_admin",
+          "manager",
+          "super_admin"
+        ],
+        "schema": ""
+      },
+      {
+        "method": "put",
+        "path": "/",
+        "roles": [
+          "company_admin",
+          "super_admin"
+        ],
+        "schema": ""
+      }
+    ]
+  },
+  "subscription": {
+    "routes": [
+      {
+        "method": "post",
+        "path": "/webhook",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/status",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "post",
+        "path": "/create",
+        "roles": "Any Authenticated / Public",
+        "schema": "createSubscriptionSchema"
+      }
+    ],
+    "validations": [
+      "export const createSubscriptionSchema = Joi.object({\n  plan: Joi.string().valid('starter', 'business', 'enterprise').required(),\n});"
+    ]
+  },
+  "task": {
+    "routes": [
+      {
+        "method": "get",
+        "path": "/",
+        "roles": "Any Authenticated / Public",
+        "schema": "taskQuerySchema"
+      },
+      {
+        "method": "post",
+        "path": "/",
+        "roles": "Any Authenticated / Public",
+        "schema": "createTaskSchema"
+      },
+      {
+        "method": "put",
+        "path": "/:id",
+        "roles": "Any Authenticated / Public",
+        "schema": "updateTaskSchema"
+      }
+    ],
+    "validations": [
+      "export const createTaskSchema = Joi.object({\n  title: Joi.string().min(2).max(250).required(),\n  deadline: Joi.string().max(100).allow('').optional(),\n  userId: Joi.string().hex().length(24).optional(),\n  projectId: Joi.string().hex().length(24).allow('').optional(),\n});",
+      "export const updateTaskSchema = Joi.object({\n  title: Joi.string().min(2).max(250).optional(),\n  deadline: Joi.string().max(100).allow('').optional(),\n  done: Joi.boolean().optional(),\n  projectId: Joi.string().hex().length(24).allow('').optional(),\n});",
+      "export const taskQuerySchema = Joi.object({\n  userId: Joi.string().hex().length(24).optional(),\n  done: Joi.string().valid('true', 'false').optional(),\n  projectId: Joi.string().hex().length(24).optional(),\n});"
+    ]
+  },
+  "tenant": {
+    "routes": [
+      {
+        "method": "post",
+        "path": "/",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "get",
+        "path": "/:id",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "put",
+        "path": "/:id",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      },
+      {
+        "method": "delete",
+        "path": "/:id",
+        "roles": "Any Authenticated / Public",
+        "schema": ""
+      }
+    ]
+  }
+}

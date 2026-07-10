@@ -274,3 +274,94 @@ export const cancelLeave = asyncHandler(async (req: AuthRequest, res: Response):
 
   res.json(new ApiResponse(200, 'Leave cancelled successfully.', leave));
 });
+
+export const getLeaveSummary = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user;
+  if (!user || !user.tenantId || !user._id) {
+    throw new ApiError(401, 'Unauthorized');
+  }
+  const userId = user._id;
+  const tenantId = user.tenantId;
+
+  // Fetch policy limits
+  const policy = await LeavePolicy.findOne({ tenantId }).lean();
+  const limits = {
+    casual: policy?.casualLeavesPerYear || 0,
+    sick: policy?.sickLeavesPerYear || 0,
+    paid: policy?.paidLeavesPerYear || 0,
+  };
+
+  const currentYear = new Date().getFullYear();
+  const startOfYear = new Date(currentYear, 0, 1);
+  const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59, 999);
+
+  // Aggregate used leaves this year
+  const usedLeaves = await Leave.aggregate([
+    {
+      $match: {
+        userId,
+        tenantId,
+        status: 'approved',
+        startDate: { $gte: startOfYear },
+        endDate: { $lte: endOfYear }
+      }
+    },
+    {
+      $group: {
+        _id: '$leaveType',
+        usedCount: { $sum: 1 } // Note: If leaves span multiple days, this needs to calculate days. But for now counting documents or we can calculate difference.
+      }
+    }
+  ]);
+
+  // If calculating actual days:
+  const usedLeavesDays = await Leave.aggregate([
+    {
+      $match: {
+        userId,
+        tenantId,
+        status: 'approved',
+        startDate: { $gte: startOfYear }
+      }
+    },
+    {
+      $project: {
+        leaveType: 1,
+        days: {
+          $add: [
+            { $divide: [{ $subtract: ['$endDate', '$startDate'] }, 1000 * 60 * 60 * 24] },
+            1
+          ]
+        }
+      }
+    },
+    {
+      $group: {
+        _id: '$leaveType',
+        usedCount: { $sum: '$days' }
+      }
+    }
+  ]);
+
+  const used = {
+    casual: 0,
+    sick: 0,
+    paid: 0,
+  };
+
+  usedLeavesDays.forEach(item => {
+    if (item._id === 'casual') used.casual = item.usedCount;
+    if (item._id === 'sick') used.sick = item.usedCount;
+    if (item._id === 'paid') used.paid = item.usedCount;
+  });
+
+  res.json(new ApiResponse(200, 'Leave summary fetched successfully.', {
+    limits,
+    used,
+    remaining: {
+      casual: Math.max(0, limits.casual - used.casual),
+      sick: Math.max(0, limits.sick - used.sick),
+      paid: Math.max(0, limits.paid - used.paid),
+    }
+  }));
+});

@@ -1,5 +1,7 @@
+/// <reference types="jest" />
 import request from 'supertest';
 import { app } from '../src/app';
+import { User } from '../src/modules/employee/employee.model';
 
 describe('Auth Integration Tests', () => {
   const testUser = {
@@ -31,6 +33,8 @@ describe('Auth Integration Tests', () => {
 
   it('logs in with correct credentials', async () => {
     await request(app).post('/api/auth/register').send(testUser);
+    await User.updateOne({ email: testUser.email }, { $set: { isEmailVerified: true } });
+    
     const res = await request(app)
       .post('/api/auth/login')
       .send({ email: testUser.email, password: testUser.password });
@@ -40,6 +44,8 @@ describe('Auth Integration Tests', () => {
 
   it('rejects wrong password', async () => {
     await request(app).post('/api/auth/register').send(testUser);
+    await User.updateOne({ email: testUser.email }, { $set: { isEmailVerified: true } });
+
     const res = await request(app)
       .post('/api/auth/login')
       .send({ email: testUser.email, password: 'wrongpassword' });

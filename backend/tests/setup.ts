@@ -27,12 +27,7 @@ beforeAll(async () => {
   await mongoose.connect(uri);
 });
 
-afterEach(async () => {
-  const collections = mongoose.connection.collections;
-  for (const key in collections) {
-    await collections[key].deleteMany({});
-  }
-});
+// State persists across tests in a single file
 
 afterAll(async () => {
   await mongoose.connection.dropDatabase();

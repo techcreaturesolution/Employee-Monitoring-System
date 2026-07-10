@@ -10,7 +10,7 @@ export const updateProjectSchema = Joi.object({
   name: Joi.string().min(2).max(100).optional(),
   description: Joi.string().max(1000).allow('').optional(),
   members: Joi.array().items(Joi.string().hex().length(24)).optional(),
-  status: Joi.string().valid('active', 'completed', 'on_hold').optional(),
+  status: Joi.string().valid('active', 'completed', 'archived').optional(),
 });
 
 export const addTimeEntrySchema = Joi.object({
@@ -22,5 +22,5 @@ export const addTimeEntrySchema = Joi.object({
 export const projectQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(20),
-  status: Joi.string().valid('active', 'completed', 'on_hold').optional(),
+  status: Joi.string().valid('active', 'completed', 'archived').optional(),
 });

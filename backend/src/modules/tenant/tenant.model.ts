@@ -45,6 +45,11 @@ export interface ITenant extends Document {
   };
   subscriptionId: mongoose.Types.ObjectId;
   trialEndsAt: Date;
+  isEmailVerified: boolean;
+  emailVerificationTokenHash?: string;
+  emailVerificationExpiry?: Date;
+  pendingEmail?: string;
+  onboardingCompleted: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -105,6 +110,11 @@ const tenantSchema = new Schema<ITenant>(
     },
     subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription' },
     trialEndsAt: { type: Date, default: () => new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },
+    isEmailVerified: { type: Boolean, default: false },
+    emailVerificationTokenHash: { type: String, select: false },
+    emailVerificationExpiry: { type: Date, select: false },
+    pendingEmail: { type: String, select: false },
+    onboardingCompleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

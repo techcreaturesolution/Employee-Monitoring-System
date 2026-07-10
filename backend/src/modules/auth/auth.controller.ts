@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { User } from '../employee/employee.model';
 import { Tenant } from '../tenant/tenant.model';
 import { Attendance } from '../attendance/attendance.model';
+import { Department } from '../department/department.model';
 import { generateTokens, generateAgentKey, formatDate, calculateWorkMinutes } from '../../utils/helpers';
 import { AuthRequest } from '../../middleware/auth';
 import { config } from '../../config';
@@ -15,7 +16,7 @@ import { ApiError } from '../../utils/ApiError';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { checkPasswordStrength } from '../../utils/passwordStrength';
 import { sendEmail } from '../../services/email.service';
-import { welcomeEmailTemplate, passwordResetTemplate, passwordChangedTemplate } from '../../services/emailTemplates';
+import { welcomeEmailTemplate, passwordResetTemplate, passwordChangedTemplate, verificationEmailTemplate } from '../../services/emailTemplates';
 
 interface JwtPayload {
   userId: string;
@@ -47,6 +48,9 @@ export const register = asyncHandler(async (req: Request, res: Response): Promis
     phone: validated.phone || '',
   });
 
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
   const user = await User.create({
     name: validated.name,
     email: validated.email,
@@ -55,6 +59,8 @@ export const register = asyncHandler(async (req: Request, res: Response): Promis
     tenantId: tenant._id,
     phone: validated.phone || '',
     agentKey: generateAgentKey(),
+    emailVerificationTokenHash: hashedToken,
+    emailVerificationExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000)
   });
 
   const { accessToken, refreshToken: newRefreshToken } = generateTokens(user);
@@ -75,11 +81,15 @@ export const register = asyncHandler(async (req: Request, res: Response): Promis
     path: '/',
   });
 
+  await cache.set(`email_verify:${hashedToken}`, String(user._id), 24 * 60 * 60); // 24 hours
+
+  const verifyLink = `${config.frontendUrl}/verify-email?token=${rawToken}`;
+  
   sendEmail({
     to: user.email,
-    subject: 'Welcome to EMS',
-    html: welcomeEmailTemplate(user.name, tenant.name),
-  }).catch((err: any) => logger.error('Failed to send welcome email:', err));
+    subject: 'Welcome to EMS - Verify Your Email',
+    html: verificationEmailTemplate(user.name, verifyLink),
+  }).catch((err: any) => logger.error('Failed to send verification email:', err));
 
   res.status(201).json(
     new ApiResponse(201, 'Company registered successfully.', {
@@ -112,6 +122,10 @@ export const login = asyncHandler(async (req: Request, res: Response): Promise<v
 
   if (user.status !== 'active') {
     throw new ApiError(403, 'Your account has been deactivated.');
+  }
+
+  if (!user.isEmailVerified) {
+    throw new ApiError(403, 'Please verify your email before logging in.');
   }
 
   const isMatch = await user.comparePassword(password);
@@ -442,7 +456,7 @@ export const forgotPassword = asyncHandler(async (req: Request, res: Response): 
     html: passwordResetTemplate(user.name, resetLink),
   });
 
-  if (config.email.mode === 'sandbox' && result.previewUrl) {
+  if (result.previewUrl) {
     res.json(new ApiResponse(200, 'If an account with that email exists, a password reset link has been sent.', { _sandboxPreviewUrl: result.previewUrl }));
     return;
   }
@@ -482,4 +496,156 @@ export const resetPassword = asyncHandler(async (req: Request, res: Response): P
   }).catch(() => {});
 
   res.json(new ApiResponse(200, 'Password has been reset successfully. You can now log in.', {}));
+});
+
+export const verifyEmail = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { token } = req.query;
+  if (!token || typeof token !== 'string') {
+    throw new ApiError(400, 'Token is required.');
+  }
+
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  const userId = await cache.get(`email_verify:${hashedToken}`);
+
+  let user;
+  if (userId) {
+    user = await User.findById(userId).select('+emailVerificationTokenHash +emailVerificationExpiry');
+  } else {
+    user = await User.findOne({
+      emailVerificationTokenHash: hashedToken,
+      emailVerificationExpiry: { $gt: new Date() },
+    }).select('+emailVerificationTokenHash +emailVerificationExpiry');
+  }
+
+  if (!user) {
+    throw new ApiError(400, 'Verification token is invalid or has expired.');
+  }
+
+  await User.updateOne(
+    { _id: user._id },
+    {
+      $set: { isEmailVerified: true },
+      $unset: { emailVerificationTokenHash: 1, emailVerificationExpiry: 1 }
+    }
+  );
+  
+  if (user.tenantId) {
+    await Tenant.findByIdAndUpdate(user.tenantId, { isEmailVerified: true });
+  }
+
+  await cache.delete(`email_verify:${hashedToken}`);
+  
+  sendEmail({
+    to: user.email,
+    subject: 'Welcome to EMS',
+    html: welcomeEmailTemplate(user.name, 'EMS'),
+  }).catch((err: any) => logger.error('Failed to send welcome email after verification:', err));
+
+  res.json(new ApiResponse(200, 'Email verified successfully. You can now log in.', {}));
+});
+
+export const resendVerification = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { email } = req.body;
+  if (!email) {
+    throw new ApiError(400, 'Email is required.');
+  }
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+  if (!user) {
+    res.json(new ApiResponse(200, 'If an account with that email exists, a verification link has been sent.', {}));
+    return;
+  }
+
+  if (user.isEmailVerified) {
+    throw new ApiError(400, 'Email is already verified.');
+  }
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  await cache.set(`email_verify:${hashedToken}`, String(user._id), 24 * 60 * 60);
+
+  await User.updateOne(
+    { _id: user._id },
+    { 
+      emailVerificationTokenHash: hashedToken,
+      emailVerificationExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000)
+    }
+  );
+
+  const verifyLink = `${config.frontendUrl}/verify-email?token=${rawToken}`;
+  
+  sendEmail({
+    to: user.email,
+    subject: 'Welcome to EMS - Verify Your Email',
+    html: verificationEmailTemplate(user.name, verifyLink),
+  }).catch((err: any) => logger.error('Failed to send verification email:', err));
+
+  res.json(new ApiResponse(200, 'If an account with that email exists, a verification link has been sent.', {}));
+});
+
+export const onboarding = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = req.user;
+  if (!user || user.role !== 'company_admin') {
+    throw new ApiError(403, 'Only company_admin can complete onboarding.');
+  }
+
+  const { expectedEmployeeCount, departments } = req.body;
+  if (!expectedEmployeeCount || !Array.isArray(departments)) {
+    throw new ApiError(400, 'Invalid onboarding payload.');
+  }
+
+  const tenant = await Tenant.findById(user.tenantId);
+  if (!tenant) {
+    throw new ApiError(404, 'Tenant not found.');
+  }
+
+  // Create departments
+  const departmentDocs = departments.map((d: any) => ({
+    name: d.name,
+    tenantId: tenant._id,
+  }));
+  if (departmentDocs.length > 0) {
+    await Department.insertMany(departmentDocs);
+  }
+
+  // Update tenant
+  tenant.settings.maxEmployees = Number(expectedEmployeeCount);
+  tenant.onboardingCompleted = true;
+  await tenant.save();
+  await cache.delete(`tenant:${tenant._id}`);
+
+  res.json(new ApiResponse(200, 'Onboarding completed successfully.'));
+});
+
+export const verifyEmailChange = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { token } = req.query;
+  if (!token || typeof token !== 'string') {
+    throw new ApiError(400, 'Token is required.');
+  }
+
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  
+  let target: any = await User.findOne({
+    emailVerificationTokenHash: hashedToken,
+    emailVerificationExpiry: { $gt: new Date() },
+  }).select('+emailVerificationTokenHash +emailVerificationExpiry +pendingEmail');
+
+  if (!target) {
+    target = await Tenant.findOne({
+      emailVerificationTokenHash: hashedToken,
+      emailVerificationExpiry: { $gt: new Date() },
+    }).select('+emailVerificationTokenHash +emailVerificationExpiry +pendingEmail');
+  }
+
+  if (!target || !target.pendingEmail) {
+    throw new ApiError(400, 'Verification token is invalid or has expired.');
+  }
+
+  target.email = target.pendingEmail;
+  target.pendingEmail = undefined;
+  target.emailVerificationTokenHash = undefined;
+  target.emailVerificationExpiry = undefined;
+  await target.save();
+
+  res.json(new ApiResponse(200, 'Email updated successfully. You can now use your new email.'));
 });

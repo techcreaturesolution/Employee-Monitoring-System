@@ -327,26 +327,35 @@ export const downloadScreenshot = asyncHandler(async (req: AuthRequest, res: Res
 export const getScreenshotFilters = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
   const tenantId = resolveTenantScope(req);
 
-  const [employees, dateRange] = await Promise.all([
-    // All employees who have screenshots
-    Screenshot.distinct('userId', { tenantId }).then(async (ids) => {
-      return User.find({ _id: { $in: ids } }, 'name email employeeId department');
-    }),
-
-    // Oldest and newest screenshot dates
-    Promise.all([
-      Screenshot.findOne({ tenantId }).sort({ timestamp: 1 }).select('timestamp'),
-      Screenshot.findOne({ tenantId }).sort({ timestamp: -1 }).select('timestamp'),
-    ]),
+  const [result] = await Screenshot.aggregate([
+    { $match: { tenantId } },
+    {
+      $facet: {
+        users: [
+          { $group: { _id: '$userId' } }
+        ],
+        dates: [
+          { $group: { _id: null, earliest: { $min: '$timestamp' }, latest: { $max: '$timestamp' } } }
+        ]
+      }
+    }
   ]);
+
+  const userIds = result?.users?.map((u: any) => u._id) || [];
+  const employees = userIds.length > 0 
+    ? await User.find({ _id: { $in: userIds } }, 'name email employeeId department')
+    : [];
+
+  const earliest = result?.dates?.[0]?.earliest || null;
+  const latest = result?.dates?.[0]?.latest || null;
 
   res.json(
     new ApiResponse(200, 'Screenshot filters options fetched.', {
       employees,
       productivityTags: ['productive', 'neutral', 'unproductive'],
       dateRange: {
-        earliest: dateRange[0]?.timestamp || null,
-        latest:   dateRange[1]?.timestamp || null,
+        earliest,
+        latest,
       },
     })
   );

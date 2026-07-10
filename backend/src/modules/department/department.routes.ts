@@ -14,8 +14,8 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', listDepartments);
-router.post('/', authorize('company_admin', 'super_admin'), validate(createDepartmentSchema), createDepartment);
-router.put('/:id', authorize('company_admin', 'super_admin'), validate(updateDepartmentSchema), updateDepartment);
-router.delete('/:id', authorize('company_admin', 'super_admin'), deleteDepartment);
+router.post('/', authorize('company_admin', 'super_admin', 'hr'), validate(createDepartmentSchema), createDepartment);
+router.put('/:id', authorize('company_admin', 'super_admin', 'hr'), validate(updateDepartmentSchema), updateDepartment);
+router.delete('/:id', authorize('company_admin', 'super_admin', 'hr'), deleteDepartment);
 
 export default router;

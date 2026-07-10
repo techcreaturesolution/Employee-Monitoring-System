@@ -27,6 +27,6 @@ router.post('/break/start', validate(startBreakSchema), startBreak);
 router.post('/break/end', endBreak);
 router.get('/today', getTodayAttendance);
 router.get('/history', validate(attendanceQuerySchema, 'query'), getAttendanceHistory);
-router.get('/report', authorize('company_admin', 'manager', 'super_admin'), getAttendanceReport);
+router.get('/report', authorize('company_admin', 'manager', 'super_admin', 'hr'), getAttendanceReport);
 
 export default router;

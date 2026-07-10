@@ -27,47 +27,59 @@ export const getCompanyDashboard = asyncHandler(async (req: AuthRequest, res: Re
   const tenantObjId = new mongoose.Types.ObjectId(String(tenantId));
   const today = formatDate(new Date());
 
+  let userFilter: any = { tenantId: tenantObjId, role: { $ne: 'super_admin' } };
+  let filterExt: any = {};
+
+  if (req.user?.role === 'manager' && req.user?.department) {
+    userFilter.department = req.user.department;
+    const deptUsers = await User.find({ tenantId: tenantObjId, department: req.user.department }, '_id').lean();
+    const departmentUserIds = deptUsers.map(u => u._id as mongoose.Types.ObjectId);
+    filterExt = { userId: { $in: departmentUserIds } };
+  }
+
   const [
-    totalEmployees,
-    activeEmployees,
-    todayAttendanceRecords,
+    [userFacetResult],
+    [attendanceFacetResult],
     todayScreenshots,
-    onlineNow,
     recentScreenshots,
-    attendanceStats,
-    todayAbsentCount,
-    todayPresentCount,
-    todayLateCount,
     last7DaysData,
     productivityBreakdown,
   ] = await Promise.all([
-    User.countDocuments({ tenantId: tenantObjId, role: { $ne: 'super_admin' } }),
-    User.countDocuments({ tenantId: tenantObjId, status: 'active', role: { $ne: 'super_admin' } }),
-    Attendance.countDocuments({ tenantId: tenantObjId, date: today }),
-    Screenshot.countDocuments({ tenantId: tenantObjId, timestamp: { $gte: new Date(today) } }),
-    User.countDocuments({
-      tenantId: tenantObjId,
-      isOnline: true,
-      role: 'employee',
-      lastActive: { $gte: new Date(Date.now() - 5 * 60 * 1000) },
-    }),
-    Screenshot.find({ tenantId: tenantObjId })
+    User.aggregate([
+      { $match: userFilter },
+      {
+        $facet: {
+          total: [{ $count: 'count' }],
+          active: [{ $match: { status: 'active' } }, { $count: 'count' }],
+          online: [
+            { $match: { isOnline: true, lastActive: { $gte: new Date(Date.now() - 5 * 60 * 1000) } } },
+            { $count: 'count' }
+          ]
+        }
+      }
+    ]),
+    Attendance.aggregate([
+      { $match: { tenantId: tenantObjId, date: today, ...filterExt } },
+      {
+        $facet: {
+          total: [{ $count: 'count' }],
+          byStatus: [
+            {
+              $group: {
+                _id: '$status',
+                count: { $sum: 1 },
+              },
+            }
+          ]
+        }
+      }
+    ]),
+    Screenshot.countDocuments({ tenantId: tenantObjId, timestamp: { $gte: new Date(today) }, ...filterExt }),
+    Screenshot.find({ tenantId: tenantObjId, ...filterExt })
       .populate('userId', 'name email avatar')
       .sort({ timestamp: -1 })
       .limit(8)
       .lean(),
-    Attendance.aggregate([
-      { $match: { tenantId: tenantObjId, date: today } },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-        },
-      },
-    ]),
-    Attendance.countDocuments({ tenantId: tenantObjId, date: today, status: 'absent' }),
-    Attendance.countDocuments({ tenantId: tenantObjId, date: today, status: 'present' }),
-    Attendance.countDocuments({ tenantId: tenantObjId, date: today, status: 'late' }),
     Attendance.aggregate([
       {
         $match: {
@@ -76,6 +88,7 @@ export const getCompanyDashboard = asyncHandler(async (req: AuthRequest, res: Re
           date: {
             $gte: new Date(new Date().setDate(new Date().getDate() - 6)).toISOString().split('T')[0],
           },
+          ...filterExt
         },
       },
       {
@@ -93,6 +106,7 @@ export const getCompanyDashboard = asyncHandler(async (req: AuthRequest, res: Re
         $match: {
           tenantId: tenantObjId,
           startTime: { $gte: new Date(today) },
+          ...filterExt
         },
       },
       {
@@ -103,6 +117,23 @@ export const getCompanyDashboard = asyncHandler(async (req: AuthRequest, res: Re
       },
     ]),
   ]);
+
+  const totalEmployees = userFacetResult?.total[0]?.count || 0;
+  const activeEmployees = userFacetResult?.active[0]?.count || 0;
+  const onlineNow = userFacetResult?.online[0]?.count || 0;
+
+  const todayAttendanceRecords = attendanceFacetResult?.total[0]?.count || 0;
+  const attendanceStats = attendanceFacetResult?.byStatus || [];
+  
+  let todayAbsentCount = 0;
+  let todayPresentCount = 0;
+  let todayLateCount = 0;
+
+  attendanceStats.forEach((stat: any) => {
+    if (stat._id === 'absent') todayAbsentCount = stat.count;
+    if (stat._id === 'present') todayPresentCount = stat.count;
+    if (stat._id === 'late') todayLateCount = stat.count;
+  });
 
   // Build map for quick lookup
   const attendanceMap = new Map(last7DaysData.map((item) => [item._id, item.count]));

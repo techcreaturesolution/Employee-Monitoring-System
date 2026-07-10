@@ -59,52 +59,68 @@ const getSandboxTransport = (): Promise<Transporter> => {
 export const sendEmail = async ({ to, subject, html, replyTo }: SendEmailOptions): Promise<SendEmailResult> => {
   const from = `${config.email.fromName} <${config.email.fromAddress}>`;
 
+  let lastError: any = null;
+
+  // 1. Try SMTP First
   try {
-    switch (config.email.mode) {
-      case 'resend': {
-        const client = getResendClient();
-        const { error } = await client.emails.send({ from, to, subject, html, replyTo });
-        if (error) throw new Error(error.message);
-        logger.info(`Email sent via Resend to ${to}: "${subject}"`);
-        return { success: true };
-      }
-
-      case 'smtp': {
-        const transport = getSmtpTransport();
-        await transport.sendMail({ from, to, subject, html, replyTo });
-        logger.info(`Email sent via SMTP to ${to}: "${subject}"`);
-        return { success: true };
-      }
-
-      case 'sandbox':
-      default: {
-        const transport = await getSandboxTransport();
-        const info = await transport.sendMail({ from, to, subject, html, replyTo });
-        const previewUrl = nodemailer.getTestMessageUrl(info) || undefined;
-        logger.info(`📧 [SANDBOX] Email captured for ${to}: "${subject}"`);
-        if (previewUrl) logger.info(`📧 [SANDBOX] Preview: ${previewUrl}`);
-        return { success: true, previewUrl };
-      }
+    if (config.email.smtp.user && config.email.smtp.pass) {
+      const transport = getSmtpTransport();
+      await transport.sendMail({ from, to, subject, html, replyTo });
+      logger.info(`Email sent via SMTP to ${to}: "${subject}"`);
+      return { success: true };
     }
   } catch (error) {
+    lastError = error;
+    logger.warn(`SMTP failed for ${to}, falling back to Resend API. Error: ${error instanceof Error ? error.message : 'Unknown'}`);
+  }
+
+  // 2. Fallback to Resend API
+  try {
+    if (config.email.resendApiKey) {
+      const client = getResendClient();
+      const { error } = await client.emails.send({ from, to, subject, html, replyTo });
+      if (error) throw new Error(error.message);
+      logger.info(`Email sent via Resend to ${to}: "${subject}"`);
+      return { success: true };
+    }
+  } catch (error) {
+    lastError = error;
+    logger.warn(`Resend failed for ${to}, falling back to Sandbox. Error: ${error instanceof Error ? error.message : 'Unknown'}`);
+  }
+
+  // 3. Fallback to Sandbox (Ethereal)
+  try {
+    const transport = await getSandboxTransport();
+    const info = await transport.sendMail({ from, to, subject, html, replyTo });
+    const previewUrl = nodemailer.getTestMessageUrl(info) || undefined;
+    logger.info(`📧 [SANDBOX] Email captured for ${to}: "${subject}"`);
+    if (previewUrl) logger.info(`📧 [SANDBOX] Preview: ${previewUrl}`);
+    return { success: true, previewUrl };
+  } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown email error';
-    logger.error(`Failed to send email to ${to} ("${subject}"): ${message}`);
+    logger.error(`Failed to send email to ${to} ("${subject}") even with sandbox: ${message}`);
     return { success: false, error: message };
   }
 };
 
 export const verifyEmailConnection = async () => {
-  if (config.email.mode === 'resend') {
-    logger.info('📧 Email Service: Ready (Resend API)');
-  } else if (config.email.mode === 'smtp') {
+  logger.info('📧 Email Service Initializing...');
+
+  if (config.email.smtp.user && config.email.smtp.pass) {
     try {
       const transport = getSmtpTransport();
       await transport.verify();
-      logger.info('📧 Email Service: Ready (SMTP)');
+      logger.info('📧 Email Service: SMTP Ready (Primary)');
     } catch (error: any) {
       logger.warn(`📧 Email Service: SMTP Verification Failed - ${error.message}`);
     }
   } else {
-    logger.info('📧 Email Service: Ready (Sandbox Mode - using Ethereal)');
+    logger.info('📧 Email Service: SMTP Not Configured');
   }
+
+  if (config.email.resendApiKey) {
+    logger.info('📧 Email Service: Resend API Configured (Fallback)');
+  }
+
+  logger.info('📧 Email Service: Sandbox Mode (Ethereal) available as final fallback');
 };

@@ -15,7 +15,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', validate(notificationQuerySchema, 'query'), getMyNotifications);
-router.post('/', authorize('company_admin', 'manager', 'super_admin'), validate(createNotificationSchema), createNotificationEntry);
+router.post('/', authorize('company_admin', 'manager', 'super_admin', 'hr'), validate(createNotificationSchema), createNotificationEntry);
 router.put('/read-all', markAllAsRead);
 router.put('/:id/read', markAsRead);
 router.delete('/:id', deleteNotification);

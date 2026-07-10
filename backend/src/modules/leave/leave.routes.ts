@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { applyLeave, myLeaves, listLeaves, updateLeave, cancelLeave } from './leave.controller';
+import { applyLeave, myLeaves, listLeaves, updateLeave, cancelLeave, getLeaveSummary } from './leave.controller';
 import { authenticate, authorize } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import {
@@ -13,8 +13,9 @@ const router = Router();
 router.use(authenticate);
 
 router.post('/', validate(applyLeaveSchema), applyLeave);
+router.get('/summary', getLeaveSummary);
 router.get('/my', validate(leaveQuerySchema, 'query'), myLeaves);
-router.get('/', authorize('company_admin', 'manager', 'super_admin'), validate(leaveQuerySchema, 'query'), listLeaves);
+router.get('/', authorize('company_admin', 'manager', 'super_admin', 'hr'), validate(leaveQuerySchema, 'query'), listLeaves);
 router.put('/:id', validate(updateLeaveSchema), updateLeave);
 router.delete('/:id', cancelLeave);
 

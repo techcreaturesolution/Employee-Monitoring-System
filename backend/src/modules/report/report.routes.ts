@@ -15,19 +15,18 @@ import { authenticate, authorize } from '../../middleware/auth';
 const router = Router();
 
 router.use(authenticate);
-router.use(authorize('company_admin', 'manager', 'super_admin'));
 
 // Existing
-router.get('/attendance', getAttendanceReport);
-router.get('/productivity', getProductivityReport);
-router.get('/activity', getActivityReport);
-router.get('/screenshots', getScreenshotReport);
-router.get('/export/excel', exportExcel);
-router.get('/export/pdf', exportPDF);
+router.get('/attendance', authorize('company_admin', 'manager', 'super_admin', 'hr'), getAttendanceReport);
+router.get('/productivity', authorize('company_admin', 'manager', 'super_admin'), getProductivityReport);
+router.get('/activity', authorize('company_admin', 'manager', 'super_admin'), getActivityReport);
+router.get('/screenshots', authorize('company_admin', 'manager', 'super_admin'), getScreenshotReport);
+router.get('/export/excel', authorize('company_admin', 'manager', 'super_admin', 'hr'), exportExcel);
+router.get('/export/pdf', authorize('company_admin', 'manager', 'super_admin', 'hr'), exportPDF);
 
 // New
-router.get('/employee', getEmployeeReport);
-router.get('/project', getProjectReport);
-router.get('/task', getTaskReport);
+router.get('/employee', authorize('company_admin', 'manager', 'super_admin', 'hr'), getEmployeeReport);
+router.get('/project', authorize('company_admin', 'manager', 'super_admin'), getProjectReport);
+router.get('/task', authorize('company_admin', 'manager', 'super_admin'), getTaskReport);
 
 export default router;

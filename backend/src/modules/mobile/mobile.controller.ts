@@ -3,6 +3,7 @@ import { User } from '../employee/employee.model';
 import { Tenant } from '../tenant/tenant.model';
 import { Attendance } from '../attendance/attendance.model';
 import { LocationLog } from '../location/location.model';
+import { WFHRequest } from '../wfh/wfh.model';
 import { AuthRequest } from '../../middleware/auth';
 import { generateTokens, formatDate, calculateWorkMinutes, isInsideGeofence } from '../../utils/helpers';
 import { asyncHandler } from '../../utils/asyncHandler';
@@ -96,8 +97,23 @@ export const mobilePunchIn = asyncHandler(async (req: AuthRequest, res: Response
     throw new ApiError(400, 'Location is required for punch-in.');
   }
 
+  const finalWorkMode = workMode || req.user?.workMode || 'office';
+
+  if (finalWorkMode === 'office') {
+    if ((latitude || longitude) && !insideGeofence) {
+      throw new ApiError(400, 'You must be inside an office geofence to punch in for office work mode.');
+    }
+  } else if (finalWorkMode === 'wfh') {
+    const targetDate = new Date(today);
+    targetDate.setHours(0, 0, 0, 0);
+    const wfhReq = await WFHRequest.findOne({ tenantId, userId, date: targetDate, status: 'approved' });
+    if (!wfhReq) {
+      throw new ApiError(403, 'You do not have an approved WFH request for today.');
+    }
+  }
+
   const attendance = existing || new Attendance({ userId, tenantId, date: today });
-  attendance.workMode = workMode || req.user?.workMode || 'office';
+  attendance.workMode = finalWorkMode;
   attendance.punchIn = {
     time: new Date(),
     ip: req.ip || '',
@@ -217,6 +233,16 @@ export const updateWorkMode = asyncHandler(async (req: AuthRequest, res: Respons
 
   if (!['office', 'wfh', 'field'].includes(workMode)) {
     throw new ApiError(400, 'Invalid work mode. Use office, wfh, or field.');
+  }
+
+  if (workMode === 'wfh') {
+    const today = formatDate(new Date());
+    const targetDate = new Date(today);
+    targetDate.setHours(0, 0, 0, 0);
+    const wfhReq = await WFHRequest.findOne({ tenantId: req.user?.tenantId, userId, date: targetDate, status: 'approved' });
+    if (!wfhReq) {
+      throw new ApiError(403, 'You do not have an approved WFH request for today. Cannot switch to wfh mode.');
+    }
   }
 
   await User.findByIdAndUpdate(userId, { workMode });

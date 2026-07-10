@@ -3,6 +3,7 @@ import { Attendance } from './attendance.model';
 import { AuthRequest } from '../../middleware/auth';
 import { Tenant } from '../tenant/tenant.model';
 import { User } from '../employee/employee.model';
+import { WFHRequest } from '../wfh/wfh.model';
 import { createNotification } from '../../utils/notification';
 import {
   formatDate,
@@ -79,8 +80,26 @@ export const punchIn = asyncHandler(async (req: AuthRequest, res: Response): Pro
     }
   }
 
+  const finalWorkMode = workMode || req.user?.workMode || 'office';
+
+  if (finalWorkMode === 'office') {
+    if (location && location.latitude && location.longitude && !insideGeofence) {
+      throw new ApiError(400, 'You must be inside an office geofence to punch in for office work mode.');
+    }
+    if (tenant?.settings?.requireLocationForPunch && (!location || !location.latitude || !location.longitude)) {
+      throw new ApiError(400, 'Location is required to punch in for office work mode.');
+    }
+  } else if (finalWorkMode === 'wfh') {
+    const targetDate = new Date(today);
+    targetDate.setHours(0, 0, 0, 0);
+    const wfhReq = await WFHRequest.findOne({ tenantId, userId, date: targetDate, status: 'approved' });
+    if (!wfhReq) {
+      throw new ApiError(403, 'You do not have an approved WFH request for today.');
+    }
+  }
+
   const attendance = existing || new Attendance({ userId, tenantId, date: today });
-  attendance.workMode = insideGeofence ? 'office' : workMode || req.user?.workMode || 'office';
+  attendance.workMode = finalWorkMode;
   attendance.punchIn = {
     time: new Date(),
     ip: ip || req.ip || '',

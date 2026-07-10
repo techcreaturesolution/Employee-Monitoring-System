@@ -13,7 +13,7 @@ import { Screenshot } from '../screenshot/screenshot.model';
 import mongoose from 'mongoose';
 import { cache } from '../../services/cache';
 import { sendEmail } from '../../services/email.service';
-import { employeeInviteTemplate } from '../../services/emailTemplates';
+import { employeeInviteTemplate, emailChangeVerificationTemplate, oldEmailSecurityAlertTemplate, profileUpdatedTemplate } from '../../services/emailTemplates';
 import { config } from '../../config';
 import { resolveTenantScope } from '../../utils/resolveTenantScope';
 
@@ -91,10 +91,16 @@ export const addEmployee = asyncHandler(async (req: AuthRequest, res: Response):
     responseData.tempPassword = tempPassword; // Send it back to the client once
   }
 
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+  await cache.set(`email_verify:${hashedToken}`, String(employee._id), 24 * 60 * 60);
+
+  const verifyLink = `${config.frontendUrl}/verify-email?token=${rawToken}`;
+
   sendEmail({
     to: employee.email,
-    subject: 'You have been added to EMS',
-    html: employeeInviteTemplate(employee.name, finalPassword, `${config.frontendUrl}/login`),
+    subject: 'You have been added to EMS - Verify Your Email',
+    html: employeeInviteTemplate(employee.name, finalPassword, verifyLink),
   }).catch((err: any) => logger.error('Failed to send employee invite email:', err));
 
   res.status(201).json(new ApiResponse(201, 'Employee added successfully.', responseData));
@@ -116,12 +122,48 @@ export const updateEmployee = asyncHandler(async (req: AuthRequest, res: Respons
   const { id } = req.params;
   const tenantId = resolveTenantScope(req);
 
+  const existingEmployee = await User.findOne({ _id: id, tenantId });
+  if (!existingEmployee) {
+    throw new ApiError(404, 'Employee not found.');
+  }
+
   const allowedUpdates = ['name', 'department', 'designation', 'phone', 'status', 'role', 'employeeId', 'workMode'];
   const updates: Record<string, unknown> = {};
+  const changedFields: string[] = [];
+
   for (const key of allowedUpdates) {
-    if (req.body[key] !== undefined) {
+    if (req.body[key] !== undefined && req.body[key] !== (existingEmployee as any)[key]) {
       updates[key] = req.body[key];
+      changedFields.push(key);
     }
+  }
+
+  if (req.body.email && req.body.email !== existingEmployee.email) {
+    const emailExists = await User.findOne({ email: req.body.email });
+    if (emailExists) {
+      throw new ApiError(409, 'Email is already in use by another user.');
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    
+    updates['pendingEmail'] = req.body.email;
+    updates['emailVerificationTokenHash'] = hashedToken;
+    updates['emailVerificationExpiry'] = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const verifyLink = `${config.frontendUrl}/verify-email-change?token=${rawToken}`;
+    
+    sendEmail({
+      to: req.body.email,
+      subject: 'Confirm your new email address',
+      html: emailChangeVerificationTemplate(existingEmployee.name, verifyLink),
+    }).catch(err => logger.error('Failed to send email change verification:', err));
+
+    sendEmail({
+      to: existingEmployee.email,
+      subject: 'Security Alert: Email Change Requested',
+      html: oldEmailSecurityAlertTemplate(existingEmployee.name),
+    }).catch(err => logger.error('Failed to send old email security alert:', err));
   }
 
   const employee = await User.findOneAndUpdate(
@@ -130,11 +172,15 @@ export const updateEmployee = asyncHandler(async (req: AuthRequest, res: Respons
     { new: true }
   );
 
-  if (!employee) {
-    throw new ApiError(404, 'Employee not found.');
+  if (changedFields.length > 0 && employee) {
+    sendEmail({
+      to: employee.email,
+      subject: 'Your EMS profile was updated',
+      html: profileUpdatedTemplate(employee.name, changedFields),
+    }).catch(err => logger.error('Failed to send profile-update email:', err));
   }
 
-  await cache.delete(`user:${employee._id}`);
+  await cache.delete(`user:${employee?._id}`);
 
   res.json(new ApiResponse(200, 'Employee updated.', employee));
 });

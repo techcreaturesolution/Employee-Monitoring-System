@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { User, IUser } from '../modules/employee/employee.model';
+import { RolePermission } from '../modules/permissions/permission.model';
 import { cache } from '../services/cache';
 
 export interface AuthRequest extends Request {
@@ -64,6 +65,43 @@ export const authorize = (...roles: string[]) => {
       return;
     }
     next();
+  };
+};
+
+export const authorizeDynamic = (module: string, action: string) => {
+  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Not authenticated.' });
+        return;
+      }
+      
+      const { role, tenantId } = req.user;
+      
+      // super_admin usually has access to everything
+      if (role === 'super_admin' || role === 'company_admin') {
+        return next();
+      }
+
+      const cacheKey = `permissions:${tenantId}:${role}:${module}`;
+      let permission = await cache.get<any>(cacheKey);
+
+      if (!permission) {
+        permission = await RolePermission.findOne({ tenantId, role, module });
+        if (permission) {
+          await cache.set(cacheKey, permission, 300); // 5 min
+        }
+      }
+
+      if (!permission || !permission.actions || !permission.actions.includes(action)) {
+        res.status(403).json({ success: false, message: `Not authorized to perform '${action}' on '${module}'.` });
+        return;
+      }
+
+      next();
+    } catch (err) {
+      res.status(500).json({ success: false, message: 'Authorization error.' });
+    }
   };
 };
 

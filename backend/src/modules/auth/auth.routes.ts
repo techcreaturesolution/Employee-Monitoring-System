@@ -10,8 +10,12 @@ import {
   changePassword,
   forgotPassword,
   resetPassword,
+  verifyEmail,
+  verifyEmailChange,
+  resendVerification,
+  onboarding,
 } from './auth.controller';
-import { authenticate } from '../../middleware/auth';
+import { authenticate, authorize } from '../../middleware/auth';
 import { uploadAvatar } from '../../middleware/upload';
 import { validate } from '../../middleware/validate';
 import {
@@ -27,7 +31,11 @@ import rateLimit from 'express-rate-limit';
 const router = Router();
 
 router.post('/register', validate(registerSchema), register);
+router.get('/verify-email', verifyEmail);
+router.get('/verify-email-change', verifyEmailChange);
+router.post('/resend-verification', resendVerification);
 router.post('/login', validate(loginSchema), login);
+router.post('/onboarding', authenticate, authorize('company_admin'), onboarding);
 router.get('/me', authenticate, getMe);
 router.put('/profile', authenticate, validate(updateProfileSchema), updateProfile);
 router.put('/change-password', authenticate, validate(changePasswordSchema), changePassword);

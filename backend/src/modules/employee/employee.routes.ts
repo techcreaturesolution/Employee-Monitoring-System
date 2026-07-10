@@ -24,20 +24,20 @@ router.use(authenticate);
 // Existing
 router.get(
   '/',
-  authorize('company_admin', 'manager', 'super_admin'),
+  authorize('company_admin', 'manager', 'super_admin', 'hr'),
   validate(employeeQuerySchema, 'query'),
   listEmployees
 );
 router.post(
   '/',
-  authorize('company_admin', 'super_admin'),
+  authorize('company_admin', 'super_admin', 'hr'),
   validate(addEmployeeSchema),
   addEmployee
 );
-router.get('/:id', authorize('company_admin', 'manager', 'super_admin'), getEmployee);
+router.get('/:id', authorize('company_admin', 'manager', 'super_admin', 'hr'), getEmployee);
 router.put(
   '/:id',
-  authorize('company_admin', 'super_admin'),
+  authorize('company_admin', 'super_admin', 'hr'),
   validate(updateEmployeeSchema),
   updateEmployee
 );
