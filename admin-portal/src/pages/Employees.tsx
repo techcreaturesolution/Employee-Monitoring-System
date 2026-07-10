@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { employeeAPI } from '../services/api';
+import { employeeAPI, departmentAPI } from '../services/api';
 import { User, Pagination } from '../types';
 import {
   Plus,
@@ -16,7 +16,6 @@ import {
   EyeOff,
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
-import { addAuditLog } from '../services/auditLogger';
 import { useAuth } from '../context/AuthContext';
 
 const Employees: React.FC = () => {
@@ -25,6 +24,7 @@ const Employees: React.FC = () => {
   const navigate = useNavigate();
   
   const [employees, setEmployees] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ total: 0, page: 1, limit: 20, pages: 0 });
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -67,19 +67,36 @@ const Employees: React.FC = () => {
   };
 
   useEffect(() => {
+    const fetchDepts = async () => {
+      try {
+        const res = await departmentAPI.list({ limit: 100 });
+        setDepartments(res.data.data || []);
+      } catch (e) {
+        console.error('Failed to load departments');
+      }
+    };
+
     if (user) {
       fetchEmployees();
+      if (['company_admin', 'super_admin', 'hr', 'manager'].includes(user.role)) {
+        fetchDepts();
+      }
     }
   }, [user, search]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload = { ...form };
+      if (!payload.password) {
+        delete (payload as any).password;
+      }
+      
       if (editingId) {
-        await employeeAPI.update(editingId, form);
+        await employeeAPI.update(editingId, payload);
         toast.success('Employee updated');
       } else {
-        await employeeAPI.add(form);
+        await employeeAPI.add(payload);
         toast.success('Employee added');
       }
       setShowModal(false);
@@ -112,13 +129,6 @@ const Employees: React.FC = () => {
     try {
       await employeeAPI.delete(id);
       toast.success('Employee deactivated');
-      if (emp) {
-        addAuditLog({
-          action: 'Employee Deleted',
-          details: `Employee "${emp.name}" (${emp.email}) was deactivated/deleted`,
-          severity: 'danger'
-        });
-      }
       fetchEmployees();
     } catch (error) {
       toast.error('Failed to deactivate');
@@ -345,12 +355,18 @@ const Employees: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1.5">Department</label>
-                  <input
-                    type="text"
+                  <select
                     value={form.department}
                     onChange={(e) => setForm({ ...form, department: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#0d1117] border border-[#30363d] focus:border-blue-500 rounded-lg text-white text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-all"
-                  />
+                    className="w-full px-3 py-2 bg-[#0d1117] border border-[#30363d] focus:border-blue-500 rounded-lg text-white text-sm outline-none focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer"
+                  >
+                    <option value="" className="bg-[#161b22] text-slate-500">Select Department...</option>
+                    {departments.map((dept) => (
+                      <option key={dept._id} value={dept.name} className="bg-[#161b22] text-white">
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1.5">Designation</label>

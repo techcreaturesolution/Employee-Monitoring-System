@@ -94,8 +94,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const adminNavItems = [
     { path: '/dashboard',     label: 'Dashboard',          icon: LayoutDashboard },
     { path: '/employees',     label: 'Employees',          icon: Users },
+    { path: '/departments',   label: 'Departments',        icon: Building2 },
     { path: '/attendance',    label: 'Attendance',         icon: Clock },
     { path: '/leaves',        label: 'Leave Management',   icon: Calendar },
+    { path: '/wfh',           label: 'WFH Requests',       icon: Globe },
     { path: '/projects',      label: 'Projects',           icon: FolderOpen },
     { path: '/tasks',         label: 'Tasks',              icon: FileText },
     { path: '/activity',      label: 'Activity Monitoring', icon: Activity },
@@ -103,6 +105,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/location',      label: 'Location Tracking',  icon: MapPin },
     { path: '/reports',       label: 'Reports',            icon: BarChart3 },
     { path: '/notifications', label: 'Notifications',      icon: Bell },
+    { path: '/permissions',   label: 'Permissions',        icon: Shield },
     { path: '/settings',      label: 'Company Settings',   icon: Settings },
   ];
 
@@ -112,6 +115,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { path: '/attendance',    label: 'My Attendance',      icon: Clock },
     { path: '/tasks',         label: 'My Tasks',           icon: FileText },
     { path: '/leaves',        label: 'My Leaves',          icon: Calendar },
+    { path: '/wfh',           label: 'WFH Requests',       icon: Globe },
     { path: '/screenshots',   label: 'My Screenshots',     icon: Camera },
     { path: '/activity',      label: 'Activity History',   icon: Activity },
     { path: '/location',      label: 'Location Tracking',  icon: MapPin },
@@ -127,6 +131,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       icon: Users,
       items: [
         { path: '/employees', label: 'Team Members' },
+        { path: '/departments', label: 'Departments' },
         { path: '/attendance', label: 'Team Attendance' },
         { path: '/activity', label: 'Team Activity' },
         { path: '/reports?tab=productivity', label: 'Team Performance' },
@@ -158,6 +163,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { path: '/attendance', label: 'Today\'s Attendance' },
         { path: '/reports?tab=attendance', label: 'Monthly Attendance' },
         { path: '/leaves', label: 'Leave Requests' },
+        { path: '/wfh', label: 'WFH Requests' },
       ],
     },
     {

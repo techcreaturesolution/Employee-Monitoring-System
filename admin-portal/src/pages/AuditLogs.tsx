@@ -2,125 +2,116 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   FileText,
   Search,
-  Trash2,
   Download,
   User,
-  ShieldAlert,
-  RefreshCw,
-  Layers,
   ShieldCheck,
-  UserX,
-  Calendar,
   Building2,
+  Layers,
+  UserX,
   Monitor,
-  CheckCircle2,
+  Info,
+  SlidersHorizontal,
   X,
   ChevronLeft,
-  ChevronRight,
-  Info,
-  SlidersHorizontal
+  ChevronRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SuperAdminPage from './SuperAdminPage';
-import { getAuditLogs, clearAuditLogs, AuditLog } from '../services/auditLogger';
+import { auditAPI } from '../services/api';
+
+export interface AuditLog {
+  _id: string;
+  userId?: {
+    _id: string;
+    name: string;
+    email: string;
+    role: string;
+  };
+  action: string;
+  resource: string;
+  resourceId?: string;
+  details?: Record<string, unknown>;
+  ipAddress: string;
+  userAgent: string;
+  status: 'success' | 'failure';
+  createdAt: string;
+}
 
 const AuditLogsPage: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [search, setSearch] = useState('');
   const [filterAction, setFilterAction] = useState<string>('all');
-  const [filterSeverity, setFilterSeverity] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterDate, setFilterDate] = useState<string>('all');
+  const [loading, setLoading] = useState(true);
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+  const [totalItems, setTotalItems] = useState(0);
 
-  // Load logs
-  const fetchLogs = () => {
-    const data = getAuditLogs();
-    setLogs(data);
+  // Compute metrics from the data we have, or from backend (but currently we just do it from what we fetched)
+  const stats = useMemo(() => {
+    const total = totalItems || logs.length;
+    const logins = logs.filter(l => l.action.toLowerCase().includes('login')).length;
+    const companies = logs.filter(l => l.resource === 'Tenant' || l.action === 'Company Created').length;
+    const subChanges = logs.filter(l => l.resource === 'Subscription' || l.action === 'Subscription Changed').length;
+    const employeeDeletions = logs.filter(l => l.action.toLowerCase().includes('delete') && l.resource === 'User').length;
+    return { total, logins, companies, subChanges, employeeDeletions };
+  }, [logs, totalItems]);
+
+  const fetchLogs = async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, string | number> = {
+        page: currentPage,
+        limit: itemsPerPage,
+      };
+
+      if (search) params.action = search; // very basic search on action
+      if (filterAction !== 'all') params.action = filterAction;
+      if (filterStatus !== 'all') params.status = filterStatus;
+
+      // Handle date filters by adding startDate and endDate
+      if (filterDate !== 'all') {
+        const now = new Date();
+        let startDate = new Date();
+        if (filterDate === 'today') {
+          startDate.setHours(0, 0, 0, 0);
+        } else if (filterDate === 'week') {
+          startDate.setDate(now.getDate() - 7);
+        } else if (filterDate === 'month') {
+          startDate.setDate(now.getDate() - 30);
+        }
+        params.startDate = startDate.toISOString();
+        params.endDate = now.toISOString();
+      }
+
+      const res = await auditAPI.list(params);
+      const data = res.data.data;
+      setLogs(data.logs || []);
+      setTotalItems(data.pagination?.total || 0);
+    } catch (err) {
+      toast.error('Failed to load audit logs');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchLogs();
-  }, []);
+  }, [currentPage, search, filterAction, filterStatus, filterDate]);
 
-  // Compute metrics
-  const stats = useMemo(() => {
-    const total = logs.length;
-    const logins = logs.filter(l => l.action === 'Admin Login').length;
-    const companies = logs.filter(l => l.action === 'Company Created').length;
-    const subChanges = logs.filter(l => l.action === 'Subscription Changed').length;
-    const employeeDeletions = logs.filter(l => l.action === 'Employee Deleted').length;
-    return { total, logins, companies, subChanges, employeeDeletions };
-  }, [logs]);
-
-  // Filter logic
-  const filteredLogs = useMemo(() => {
-    return logs.filter(log => {
-      // Search filter
-      const matchesSearch = 
-        log.actor.toLowerCase().includes(search.toLowerCase()) ||
-        log.details.toLowerCase().includes(search.toLowerCase()) ||
-        log.id.toLowerCase().includes(search.toLowerCase()) ||
-        log.ipAddress.includes(search);
-
-      // Action filter
-      const matchesAction = filterAction === 'all' || log.action === filterAction;
-
-      // Severity filter
-      const matchesSeverity = filterSeverity === 'all' || log.severity === filterSeverity;
-
-      // Date filter
-      let matchesDate = true;
-      if (filterDate !== 'all') {
-        const logDate = new Date(log.timestamp);
-        const now = new Date();
-        const diffTime = Math.abs(now.getTime() - logDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (filterDate === 'today') {
-          matchesDate = logDate.toDateString() === now.toDateString();
-        } else if (filterDate === 'week') {
-          matchesDate = diffDays <= 7;
-        } else if (filterDate === 'month') {
-          matchesDate = diffDays <= 30;
-        }
-      }
-
-      return matchesSearch && matchesAction && matchesSeverity && matchesDate;
-    });
-  }, [logs, search, filterAction, filterSeverity, filterDate]);
-
-  // Paginated logs
-  const paginatedLogs = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredLogs.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredLogs, currentPage]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / itemsPerPage));
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, filterAction, filterSeverity, filterDate]);
-
-  // Clear handler
-  const handleClear = () => {
-    if (!window.confirm('Are you sure you want to clear all audit logs? This action is irreversible.')) {
-      return;
-    }
-    clearAuditLogs();
-    setLogs([]);
-    toast.success('Audit logs cleared successfully');
-  };
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
 
   // Export handlers
   const handleExportJSON = () => {
-    if (filteredLogs.length === 0) {
+    if (logs.length === 0) {
       toast.error('No logs available to export');
       return;
     }
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(filteredLogs, null, 2));
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(logs, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
     downloadAnchor.setAttribute("download", `ems_audit_logs_${new Date().toISOString().slice(0,10)}.json`);
@@ -131,20 +122,20 @@ const AuditLogsPage: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    if (filteredLogs.length === 0) {
+    if (logs.length === 0) {
       toast.error('No logs available to export');
       return;
     }
-    const headers = ['ID', 'Action', 'Actor', 'Details', 'Timestamp', 'IP Address', 'Device', 'Severity'];
-    const rows = filteredLogs.map(log => [
-      log.id,
+    const headers = ['ID', 'Action', 'Resource', 'Actor', 'Status', 'IP Address', 'Device', 'Created At'];
+    const rows = logs.map(log => [
+      log._id,
       log.action,
-      log.actor,
-      `"${log.details.replace(/"/g, '""')}"`,
-      log.timestamp,
+      log.resource,
+      log.userId ? log.userId.name : 'System',
+      log.status,
       log.ipAddress,
-      log.device,
-      log.severity
+      `"${log.userAgent.replace(/"/g, '""')}"`,
+      log.createdAt
     ]);
 
     const csvContent = "data:text/csv;charset=utf-8," 
@@ -159,15 +150,11 @@ const AuditLogsPage: React.FC = () => {
     toast.success('Exported logs in CSV format');
   };
 
-  const getSeverityBadgeColor = (severity: AuditLog['severity']) => {
-    switch (severity) {
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
       case 'success':
         return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-      case 'info':
-        return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-      case 'warning':
-        return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-      case 'danger':
+      case 'failure':
         return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
       default:
         return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
@@ -223,20 +210,20 @@ const AuditLogsPage: React.FC = () => {
               </div>
               <p className="text-2xl font-bold text-white tracking-tight">{stats.logins}</p>
             </div>
-            <p className="text-[10px] text-slate-500 mt-2">Successful auth attempts</p>
+            <p className="text-[10px] text-slate-500 mt-2">Logins on this page</p>
           </div>
 
           <div className="bg-[#161b22] border border-[#30363d] rounded-2xl p-4.5 hover:border-slate-700 transition-all shadow-md flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">Companies Created</p>
+                <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">Companies</p>
                 <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
                   <Building2 className="w-3.5 h-3.5 text-blue-400" />
                 </div>
               </div>
               <p className="text-2xl font-bold text-white tracking-tight">{stats.companies}</p>
             </div>
-            <p className="text-[10px] text-slate-500 mt-2">Tenants registered</p>
+            <p className="text-[10px] text-slate-500 mt-2">Tenant operations</p>
           </div>
 
           <div className="bg-[#161b22] border border-[#30363d] rounded-2xl p-4.5 hover:border-slate-700 transition-all shadow-md flex flex-col justify-between">
@@ -249,20 +236,20 @@ const AuditLogsPage: React.FC = () => {
               </div>
               <p className="text-2xl font-bold text-white tracking-tight">{stats.subChanges}</p>
             </div>
-            <p className="text-[10px] text-slate-500 mt-2">Subscriptions modified</p>
+            <p className="text-[10px] text-slate-500 mt-2">Subscription ops</p>
           </div>
 
           <div className="bg-[#161b22] border border-[#30363d] rounded-2xl p-4.5 hover:border-slate-700 transition-all shadow-md col-span-2 md:col-span-4 lg:col-span-1 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">Employees Deleted</p>
+                <p className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">Deletions</p>
                 <div className="w-7 h-7 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center">
                   <UserX className="w-3.5 h-3.5 text-rose-400" />
                 </div>
               </div>
               <p className="text-2xl font-bold text-white tracking-tight">{stats.employeeDeletions}</p>
             </div>
-            <p className="text-[10px] text-slate-500 mt-2">Personnel deactivations</p>
+            <p className="text-[10px] text-slate-500 mt-2">User deletions</p>
           </div>
         </div>
 
@@ -276,7 +263,7 @@ const AuditLogsPage: React.FC = () => {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by User, Description, IP, or Log ID..."
+                placeholder="Search by Action..."
                 className="w-full pl-9 pr-4 py-2 bg-[#0d1117] border border-[#30363d] rounded-xl text-xs text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
               />
               {search && (
@@ -297,22 +284,21 @@ const AuditLogsPage: React.FC = () => {
                 className="px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-xl text-xs text-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
               >
                 <option value="all">All Actions</option>
-                <option value="Admin Login">Admin Login</option>
-                <option value="Company Created">Company Created</option>
-                <option value="Subscription Changed">Subscription Changed</option>
-                <option value="Employee Deleted">Employee Deleted</option>
+                <option value="LOGIN">LOGIN</option>
+                <option value="LOGOUT">LOGOUT</option>
+                <option value="CREATE">CREATE</option>
+                <option value="UPDATE">UPDATE</option>
+                <option value="DELETE">DELETE</option>
               </select>
 
               <select
-                value={filterSeverity}
-                onChange={(e) => setFilterSeverity(e.target.value)}
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
                 className="px-3 py-2 bg-[#0d1117] border border-[#30363d] rounded-xl text-xs text-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
               >
-                <option value="all">All Severities</option>
-                <option value="success">Success (Green)</option>
-                <option value="info">Info (Blue)</option>
-                <option value="warning">Warning (Amber)</option>
-                <option value="danger">Danger (Red)</option>
+                <option value="all">All Statuses</option>
+                <option value="success">Success</option>
+                <option value="failure">Failure</option>
               </select>
 
               <select
@@ -332,13 +318,13 @@ const AuditLogsPage: React.FC = () => {
           <div className="flex items-center justify-between border-t border-[#30363d] pt-3.5">
             <div className="flex items-center gap-1.5 text-xs text-slate-400">
               <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
-              <span>Showing {filteredLogs.length} of {logs.length} operations</span>
-              {(search || filterAction !== 'all' || filterSeverity !== 'all' || filterDate !== 'all') && (
+              <span>Showing {logs.length} of {totalItems} operations</span>
+              {(search || filterAction !== 'all' || filterStatus !== 'all' || filterDate !== 'all') && (
                 <button
                   onClick={() => {
                     setSearch('');
                     setFilterAction('all');
-                    setFilterSeverity('all');
+                    setFilterStatus('all');
                     setFilterDate('all');
                   }}
                   className="ml-2 text-blue-400 hover:underline flex items-center gap-0.5"
@@ -361,15 +347,6 @@ const AuditLogsPage: React.FC = () => {
                   <button onClick={handleExportJSON} className="w-full text-left px-3.5 py-1.5 text-[11px] text-slate-300 hover:bg-[#21262d] hover:text-white transition-colors">JSON Format</button>
                 </div>
               </div>
-
-              <button
-                onClick={handleClear}
-                disabled={logs.length === 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500 border border-rose-500/20 text-rose-400 hover:text-white text-xs font-semibold rounded-xl disabled:opacity-30 disabled:hover:bg-rose-500/10 disabled:hover:text-rose-400 transition-all"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Clear Logs
-              </button>
             </div>
           </div>
         </div>
@@ -377,85 +354,80 @@ const AuditLogsPage: React.FC = () => {
         {/* ── Data Table ── */}
         <div className="bg-[#161b22] border border-[#30363d] rounded-2xl overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-[#30363d] bg-[#161b22]">
-                  <th className="px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-20">Log ID</th>
-                  <th className="px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-24">Timestamp</th>
-                  <th className="px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-36">Action</th>
-                  <th className="px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-48">Actor</th>
-                  <th className="px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Details</th>
-                  <th className="px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-28">IP Address</th>
-                  <th className="px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-36">Device / System</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#30363d] bg-[#0d1117]/30">
-                {paginatedLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-[#161b22]/60 transition-colors">
-                    {/* Log ID */}
-                    <td className="px-5 py-3.5 text-xs font-mono font-bold text-slate-500">{log.id}</td>
-
-                    {/* Timestamp */}
-                    <td className="px-5 py-3.5 text-xs text-slate-300">
-                      <div className="group relative cursor-default">
-                        <span>{formatRelativeTime(log.timestamp)}</span>
-                        <div className="absolute left-0 bottom-full mb-2 bg-[#21262d] border border-[#30363d] text-white text-[10px] px-2 py-1 rounded shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 font-mono">
-                          {new Date(log.timestamp).toLocaleString()}
+            {loading ? (
+              <div className="p-10 text-center text-slate-400 text-sm">Loading logs...</div>
+            ) : (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-[#30363d] bg-[#161b22]">
+                    <th className="px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-24">Timestamp</th>
+                    <th className="px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-36">Action</th>
+                    <th className="px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-36">Resource</th>
+                    <th className="px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-48">Actor</th>
+                    <th className="px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Details</th>
+                    <th className="px-5 py-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider w-28">IP Address</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#30363d] bg-[#0d1117]/30">
+                  {logs.map((log) => (
+                    <tr key={log._id} className="hover:bg-[#161b22]/60 transition-colors">
+                      {/* Timestamp */}
+                      <td className="px-5 py-3.5 text-xs text-slate-300">
+                        <div className="group relative cursor-default">
+                          <span>{formatRelativeTime(log.createdAt)}</span>
+                          <div className="absolute left-0 bottom-full mb-2 bg-[#21262d] border border-[#30363d] text-white text-[10px] px-2 py-1 rounded shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 font-mono">
+                            {new Date(log.createdAt).toLocaleString()}
+                          </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Action Tag */}
-                    <td className="px-5 py-3.5 text-xs">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wide ${getSeverityBadgeColor(log.severity)}`}>
-                        {log.action}
-                      </span>
-                    </td>
-
-                    {/* Actor */}
-                    <td className="px-5 py-3.5 text-xs text-slate-200 font-semibold">
-                      <div className="flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5 text-slate-500" />
-                        <span className="truncate max-w-[170px]" title={log.actor}>
-                          {log.actor}
+                      {/* Action Tag */}
+                      <td className="px-5 py-3.5 text-xs">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-semibold uppercase tracking-wide ${getStatusBadgeColor(log.status)}`}>
+                          {log.action}
                         </span>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Details */}
-                    <td className="px-5 py-3.5 text-xs text-slate-300">
-                      <p className="line-clamp-2 max-w-[450px]" title={log.details}>
-                        {log.details}
-                      </p>
-                    </td>
+                      {/* Resource */}
+                      <td className="px-5 py-3.5 text-xs font-mono text-slate-400">{log.resource}</td>
 
-                    {/* IP Address */}
-                    <td className="px-5 py-3.5 text-xs font-mono text-slate-400">{log.ipAddress}</td>
+                      {/* Actor */}
+                      <td className="px-5 py-3.5 text-xs text-slate-200 font-semibold">
+                        <div className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5 text-slate-500" />
+                          <span className="truncate max-w-[170px]" title={log.userId?.name || 'System'}>
+                            {log.userId?.name || 'System'}
+                          </span>
+                        </div>
+                      </td>
 
-                    {/* Device / System */}
-                    <td className="px-5 py-3.5 text-xs text-slate-400">
-                      <div className="flex items-center gap-1.5">
-                        <Monitor className="w-3.5 h-3.5 text-slate-600" />
-                        <span>{log.device}</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Details */}
+                      <td className="px-5 py-3.5 text-xs text-slate-300">
+                        <p className="line-clamp-2 max-w-[450px]" title={JSON.stringify(log.details)}>
+                          {log.details ? JSON.stringify(log.details) : 'No additional details'}
+                        </p>
+                      </td>
 
-                {/* Empty State */}
-                {filteredLogs.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-16 text-center">
-                      <div className="flex flex-col items-center justify-center text-slate-500">
-                        <Info className="w-10 h-10 text-slate-600 mb-2 opacity-50" />
-                        <p className="text-sm font-semibold text-white">No audit logs found</p>
-                        <p className="text-xs text-slate-500 mt-0.5">Try adjusting your search queries or drop-down filters.</p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      {/* IP Address */}
+                      <td className="px-5 py-3.5 text-xs font-mono text-slate-400">{log.ipAddress}</td>
+                    </tr>
+                  ))}
+
+                  {/* Empty State */}
+                  {logs.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-16 text-center">
+                        <div className="flex flex-col items-center justify-center text-slate-500">
+                          <Info className="w-10 h-10 text-slate-600 mb-2 opacity-50" />
+                          <p className="text-sm font-semibold text-white">No audit logs found</p>
+                          <p className="text-xs text-slate-500 mt-0.5">Try adjusting your search queries or drop-down filters.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
 
           {/* ── Pagination ── */}
@@ -464,9 +436,9 @@ const AuditLogsPage: React.FC = () => {
               <p className="text-xs text-slate-500">
                 Showing <span className="font-semibold text-slate-300">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
                 <span className="font-semibold text-slate-300">
-                  {Math.min(currentPage * itemsPerPage, filteredLogs.length)}
+                  {Math.min(currentPage * itemsPerPage, totalItems)}
                 </span>{' '}
-                of <span className="font-semibold text-slate-300">{filteredLogs.length}</span> logs
+                of <span className="font-semibold text-slate-300">{totalItems}</span> logs
               </p>
               
               <div className="flex items-center gap-2">

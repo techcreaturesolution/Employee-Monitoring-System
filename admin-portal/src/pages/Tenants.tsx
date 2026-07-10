@@ -20,7 +20,6 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { addAuditLog } from '../services/auditLogger';
 import { useAuth } from '../context/AuthContext';
 
 interface TenantItem {
@@ -153,11 +152,6 @@ const Tenants: React.FC = () => {
         longitude: geo?.lng || 0,
       });
       toast.success('Company added successfully');
-      addAuditLog({
-        action: 'Company Created',
-        details: `Company "${formName}" created with plan "${formPlan}"`,
-        severity: 'info'
-      });
       setActiveModal(null);
       fetchTenants();
     } catch (err: any) {
@@ -181,14 +175,6 @@ const Tenants: React.FC = () => {
       });
       toast.success('Company details updated');
       
-      if (oldPlan !== formPlan) {
-        addAuditLog({
-          action: 'Subscription Changed',
-          details: `Subscription plan for company "${selectedTenant.name}" changed from "${oldPlan}" to "${formPlan}"`,
-          severity: 'warning'
-        });
-      }
-
       setActiveModal(null);
       fetchTenants();
     } catch (err: any) {
@@ -229,14 +215,6 @@ const Tenants: React.FC = () => {
       await tenantAPI.update(selectedTenant._id, { plan: formPlan });
       toast.success(`Assigned ${formPlan} plan to ${selectedTenant.name}`);
       
-      if (oldPlan !== formPlan) {
-        addAuditLog({
-          action: 'Subscription Changed',
-          details: `Subscription plan for company "${selectedTenant.name}" changed from "${oldPlan}" to "${formPlan}"`,
-          severity: 'warning'
-        });
-      }
-
       setActiveModal(null);
       fetchTenants();
     } catch (err: any) {

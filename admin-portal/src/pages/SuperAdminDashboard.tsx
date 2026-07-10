@@ -167,6 +167,7 @@ const SuperAdminDashboard: React.FC = () => {
 
     const colors = ['#3b82f6', '#22c55e', '#a855f7', '#f97316', '#06b6d4', '#eab308'];
     const distribution = tenantsList.map((t: any, idx: number) => ({
+      id: t._id || t.id || String(idx),
       company: t.name,
       employees: t.employeeCount || 0,
       color: colors[idx % colors.length],
@@ -244,10 +245,11 @@ const SuperAdminDashboard: React.FC = () => {
   const pendingRenewalsList = (dashboardData?.tenantsList || [])
     .filter((t: any) => t.status === 'trial' || t.plan === 'free')
     .slice(0, 5)
-    .map((t: any) => {
+    .map((t: any, idx: number) => {
       const planName = t.plan ? t.plan.charAt(0).toUpperCase() + t.plan.slice(1) : 'Free';
       const amt = t.plan === 'enterprise' ? '$299/mo' : t.plan === 'business' ? '$199/mo' : t.plan === 'starter' ? '$99/mo' : '$0/mo';
       return {
+        id: t._id || t.id || String(idx),
         name: t.name,
         plan: planName,
         daysLeft: t.status === 'trial' ? 7 : 30,
@@ -258,13 +260,14 @@ const SuperAdminDashboard: React.FC = () => {
   const recentCompaniesList = [...(dashboardData?.tenantsList || [])]
     .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
     .slice(0, 5)
-    .map((t: any) => {
+    .map((t: any, idx: number) => {
       const planName = t.plan ? t.plan.charAt(0).toUpperCase() + t.plan.slice(1) : 'Free';
       const createdDate = t.createdAt ? new Date(t.createdAt) : new Date();
       const diffTime = Math.abs(new Date().getTime() - createdDate.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       const joinedStr = diffDays <= 1 ? 'today' : diffDays === 2 ? 'yesterday' : `${diffDays} days ago`;
       return {
+        id: t._id || t.id || String(idx),
         name: t.name,
         plan: planName,
         employees: t.employeeCount || 0,
@@ -553,7 +556,7 @@ const SuperAdminDashboard: React.FC = () => {
         <SectionHeader icon={Users} title="Employee Distribution" badge="By Company" href="/tenants" iconColor="text-purple-400" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
           {employeeDistribution.map((e: any, i: number) => (
-            <div key={e.company} className="flex items-center gap-3">
+            <div key={e.id || i} className="flex items-center gap-3">
               {/* rank */}
               <span className="text-[10px] text-slate-600 font-mono w-4 shrink-0">{String(i + 1).padStart(2, '0')}</span>
               {/* company name */}
@@ -592,8 +595,8 @@ const SuperAdminDashboard: React.FC = () => {
         <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-5">
           <SectionHeader icon={AlertCircle} title="Pending Renewals" badge={`${pendingRenewalsList.length} due soon`} href="/subscriptions" iconColor="text-rose-400" />
           <div className="space-y-2.5">
-            {pendingRenewalsList.map((r: any) => (
-              <div key={r.name} className="flex items-center gap-3 p-2.5 bg-[#0d1117] rounded-xl border border-[#21262d] hover:border-[#30363d] transition-all">
+            {pendingRenewalsList.map((r: any, i: number) => (
+              <div key={r.id || i} className="flex items-center gap-3 p-2.5 bg-[#0d1117] rounded-xl border border-[#21262d] hover:border-[#30363d] transition-all">
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold text-white shrink-0 ${
                   r.daysLeft <= 7 ? 'bg-red-600' : r.daysLeft <= 14 ? 'bg-amber-600' : 'bg-slate-700'
                 }`}>
@@ -624,8 +627,8 @@ const SuperAdminDashboard: React.FC = () => {
         <div className="bg-[#161b22] border border-[#30363d] rounded-xl p-5">
           <SectionHeader icon={Building2} title="Recent Companies" badge="Latest tenants" href="/tenants" iconColor="text-blue-400" />
           <div className="space-y-2.5">
-            {recentCompaniesList.map(c => (
-              <div key={c.name} className="flex items-center gap-3 p-2.5 bg-[#0d1117] rounded-xl border border-[#21262d] hover:border-[#30363d] transition-all">
+            {recentCompaniesList.map((c: any, i: number) => (
+              <div key={c.id || i} className="flex items-center gap-3 p-2.5 bg-[#0d1117] rounded-xl border border-[#21262d] hover:border-[#30363d] transition-all">
                 <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-[#30363d] flex items-center justify-center shrink-0">
                   <span className="text-xs font-bold text-blue-400">{c.name.charAt(0)}</span>
                 </div>

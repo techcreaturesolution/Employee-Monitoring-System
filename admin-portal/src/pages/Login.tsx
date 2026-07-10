@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Monitor, Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { addAuditLog } from '../services/auditLogger';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -19,12 +18,6 @@ const Login: React.FC = () => {
     try {
       await login(email, password);
       toast.success('Login successful!');
-      addAuditLog({
-        action: 'Admin Login',
-        details: `${email.includes('emloyeemonitor') ? 'Super Admin' : 'Company Admin'} logged in successfully`,
-        severity: 'success',
-        actor: email
-      });
       navigate('/dashboard');
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -91,6 +84,11 @@ const Login: React.FC = () => {
               >
                 {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
               </button>
+            </div>
+            <div className="mt-2 text-right">
+              <Link to="/forgot-password" className="text-xs text-blue-500 hover:text-blue-400 font-medium transition-colors">
+                Forgot password?
+              </Link>
             </div>
           </div>
 

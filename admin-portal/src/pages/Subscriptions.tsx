@@ -16,7 +16,6 @@ import {
   Clock,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { addAuditLog } from '../services/auditLogger';
 
 interface SubscriptionItem {
   id: string;
@@ -88,13 +87,6 @@ const Subscriptions: React.FC = () => {
       const sub = subs.find(s => s.id === id);
       await tenantAPI.update(id, { plan: 'free', status: 'suspended' });
       toast.success('Subscription cancelled successfully');
-      if (sub) {
-        addAuditLog({
-          action: 'Subscription Changed',
-          details: `Subscription for company "${sub.companyName}" was cancelled`,
-          severity: 'danger'
-        });
-      }
       fetchSubscriptions();
     } catch (err) {
       toast.error('Failed to cancel subscription');
@@ -106,13 +98,6 @@ const Subscriptions: React.FC = () => {
       const sub = subs.find(s => s.id === id);
       await tenantAPI.update(id, { plan: 'business', status: 'active' });
       toast.success('Subscription activated successfully');
-      if (sub) {
-        addAuditLog({
-          action: 'Subscription Changed',
-          details: `Subscription for company "${sub.companyName}" was reactivated on Business plan`,
-          severity: 'success'
-        });
-      }
       fetchSubscriptions();
     } catch (err) {
       toast.error('Failed to reactivate subscription');

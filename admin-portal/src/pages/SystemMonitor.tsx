@@ -21,6 +21,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts';
+import { systemAPI } from '../services/api';
 
 interface LogItem {
   id: string;
@@ -53,37 +54,45 @@ const SystemMonitor: React.FC = () => {
     { id: 'LOG-005', timestamp: '17:01:23', level: 'error', service: 'GEOFENCE-SERVICE', message: 'API Call failure to Google Maps geocoding client' },
   ]);
 
-  // Simulate real-time ticks
+  // Real-time polling
   useEffect(() => {
-    const interval = setInterval(() => {
-      const newCpu = Math.max(10, Math.min(95, cpuUsage + Math.round((Math.random() - 0.5) * 8)));
-      const newMem = Math.max(40, Math.min(90, memoryUsage + Math.round((Math.random() - 0.5) * 4)));
-      const newLat = Number((Math.max(0.5, Math.min(5, dbLatency + (Math.random() - 0.5) * 0.4))).toFixed(1));
-      const newRpm = Math.max(300, Math.min(800, apiRpm + Math.round((Math.random() - 0.5) * 30)));
+    const fetchHealth = async () => {
+      try {
+        const res = await systemAPI.getHealth();
+        const data = res.data?.data;
+        if (data?.system) {
+          const sys = data.system;
+          setCpuUsage(sys.cpuUsage);
+          setMemoryUsage(sys.memoryUsage);
+          // Simulate the ones not provided by simple health endpoint
+          setDbLatency(Number((Math.max(0.5, Math.min(5, dbLatency + (Math.random() - 0.5) * 0.4))).toFixed(1)));
+          setApiRpm(Math.max(300, Math.min(800, apiRpm + Math.round((Math.random() - 0.5) * 30))));
+          
+          setLastUpdated(new Date());
 
-      setCpuUsage(newCpu);
-      setMemoryUsage(newMem);
-      setDbLatency(newLat);
-      setApiRpm(newRpm);
-      setLastUpdated(new Date());
+          const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          setCpuHistory(prev => [...prev.slice(-14), { time: timeStr, value: sys.cpuUsage }]);
+          setMemoryHistory(prev => [...prev.slice(-14), { time: timeStr, value: sys.memoryUsage }]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch health check', error);
+      }
+    };
 
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      setCpuHistory(prev => [...prev.slice(-14), { time: timeStr, value: newCpu }]);
-      setMemoryHistory(prev => [...prev.slice(-14), { time: timeStr, value: newMem }]);
-    }, 3000);
-
+    fetchHealth();
+    const interval = setInterval(fetchHealth, 3000);
     return () => clearInterval(interval);
-  }, [cpuUsage, memoryUsage, dbLatency, apiRpm]);
+  }, [dbLatency, apiRpm]);
 
   // Initial history setup
   useEffect(() => {
     const initialCpu = Array.from({ length: 15 }, (_, i) => ({
       time: new Date(Date.now() - (15 - i) * 3000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      value: 20 + Math.round(Math.random() * 20),
+      value: 0,
     }));
     const initialMem = Array.from({ length: 15 }, (_, i) => ({
       time: new Date(Date.now() - (15 - i) * 3000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-      value: 50 + Math.round(Math.random() * 10),
+      value: 0,
     }));
     setCpuHistory(initialCpu);
     setMemoryHistory(initialMem);

@@ -5,6 +5,9 @@ import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyEmail from './pages/VerifyEmail';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Attendance from './pages/Attendance';
@@ -19,6 +22,11 @@ import Managers from './pages/Managers';
 import Tasks from './pages/Tasks';
 import ReportsPage from './pages/ReportsPage';
 import Leaves from './pages/Leaves';
+import Departments from './pages/Departments';
+import WFH from './pages/WFH';
+import Permissions from './pages/Permissions';
+import LandingPage from './pages/LandingPage';
+
 
 /* ── Super Admin pages ── */
 import Subscriptions from './pages/Subscriptions';
@@ -81,8 +89,8 @@ const App: React.FC = () => {
     );
   }
 
-  const allRoles = ['super_admin', 'company_admin', 'manager', 'employee'];
-  const adminManagerSuper = ['super_admin', 'company_admin', 'manager'];
+  const allRoles = ['super_admin', 'company_admin', 'manager', 'hr', 'employee'];
+  const adminManagerSuper = ['super_admin', 'company_admin', 'manager', 'hr'];
   const adminSuper = ['super_admin', 'company_admin'];
   const superOnly = ['super_admin'];
 
@@ -97,6 +105,9 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/login"    element={user ? <Navigate to="/dashboard" /> : <Login />} />
         <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
+        <Route path="/forgot-password" element={user ? <Navigate to="/dashboard" /> : <ForgotPassword />} />
+        <Route path="/reset-password" element={user ? <Navigate to="/dashboard" /> : <ResetPassword />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
 
         {/* ── Common routes with Role Guards ── */}
         <Route path="/dashboard"   element={<ProtectedRoute allowedRoles={allRoles}><Dashboard /></ProtectedRoute>} />
@@ -105,19 +116,22 @@ const App: React.FC = () => {
         <Route path="/screenshots" element={<ProtectedRoute allowedRoles={allRoles}><Screenshots /></ProtectedRoute>} />
         <Route path="/activity"    element={<ProtectedRoute allowedRoles={allRoles}><ActivityPage /></ProtectedRoute>} />
         <Route path="/projects"    element={<ProtectedRoute allowedRoles={allRoles}><Projects /></ProtectedRoute>} />
-        <Route path="/settings"    element={<ProtectedRoute allowedRoles={allRoles}><SettingsPage /></ProtectedRoute>} />
+        <Route path="/settings"    element={<ProtectedRoute allowedRoles={adminSuper}><SettingsPage /></ProtectedRoute>} />
+        <Route path="/permissions" element={<ProtectedRoute allowedRoles={adminSuper}><Permissions /></ProtectedRoute>} />
         <Route path="/tenants"     element={<ProtectedRoute allowedRoles={superOnly}><Tenants /></ProtectedRoute>} />
         <Route path="/location"    element={<ProtectedRoute allowedRoles={allRoles}><LocationTracker /></ProtectedRoute>} />
         <Route path="/profile"     element={<ProtectedRoute allowedRoles={allRoles}><ProfilePage /></ProtectedRoute>} />
         <Route path="/managers"    element={<ProtectedRoute allowedRoles={adminSuper}><Managers /></ProtectedRoute>} />
+        <Route path="/departments" element={<ProtectedRoute allowedRoles={adminManagerSuper}><Departments /></ProtectedRoute>} />
         <Route path="/tasks"       element={<ProtectedRoute allowedRoles={allRoles}><Tasks /></ProtectedRoute>} />
         <Route path="/reports"     element={<ProtectedRoute allowedRoles={allRoles}><ReportsPage /></ProtectedRoute>} />
         <Route path="/leaves"      element={<ProtectedRoute allowedRoles={allRoles}><Leaves /></ProtectedRoute>} />
+        <Route path="/wfh"         element={<ProtectedRoute allowedRoles={allRoles}><WFH /></ProtectedRoute>} />
 
         {/* ── Super Admin routes ── */}
         <Route path="/subscriptions"   element={<ProtectedRoute allowedRoles={superOnly}><Subscriptions /></ProtectedRoute>} />
         <Route path="/users-admins"    element={<ProtectedRoute allowedRoles={superOnly}><UsersAdmins /></ProtectedRoute>} />
-        <Route path="/analytics"       element={<ProtectedRoute allowedRoles={superOnly}><Analytics /></ProtectedRoute>} />
+        <Route path="/analytics"       element={<ProtectedRoute allowedRoles={adminSuper}><Analytics /></ProtectedRoute>} />
         <Route path="/system-monitor"  element={<ProtectedRoute allowedRoles={superOnly}><SystemMonitor /></ProtectedRoute>} />
         <Route path="/notifications"   element={<ProtectedRoute allowedRoles={allRoles}><Notifications /></ProtectedRoute>} />
         <Route path="/plans-billing"   element={<ProtectedRoute allowedRoles={superOnly}><PlansBilling /></ProtectedRoute>} />
@@ -125,8 +139,8 @@ const App: React.FC = () => {
         <Route path="/audit-logs"      element={<ProtectedRoute allowedRoles={superOnly}><AuditLogs /></ProtectedRoute>} />
         <Route path="/support"         element={<ProtectedRoute allowedRoles={superOnly}><Support /></ProtectedRoute>} />
 
-        <Route path="/"  element={<Navigate to="/dashboard" />} />
-        <Route path="*"  element={<Navigate to="/dashboard" />} />
+        <Route path="/"  element={<LandingPage />} />
+        <Route path="*"  element={<Navigate to="/" />} />
       </Routes>
     </>
   );

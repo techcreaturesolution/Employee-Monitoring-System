@@ -70,19 +70,18 @@ const EmployeeDashboard: React.FC = () => {
       const data = res.data.data;
 
       setTodayAttendance(data.todayAttendance || null);
-      setProductivity(data.productivityBreakdown || []);
-      let screenshotsList = data.recentScreenshots || [];
-      if (screenshotsList.length === 0) {
-        try {
-          const ssRes = await screenshotAPI.list({ limit: 6 });
-          screenshotsList = ssRes.data?.data?.screenshots || [];
-        } catch (ssErr) {
-          console.warn('Failed to fetch fallback screenshots:', ssErr);
-        }
+      setProductivity(data.productivityToday || []);
+      
+      let screenshotsList: any[] = [];
+      try {
+        const ssRes = await screenshotAPI.list({ limit: 6 });
+        screenshotsList = ssRes.data?.data?.screenshots || [];
+      } catch (ssErr) {
+        console.warn('Failed to fetch fallback screenshots:', ssErr);
       }
 
       setRecentScreenshots(screenshotsList);
-      setScreenshotsCount(data.screenshotsCount || screenshotsList.length || 0);
+      setScreenshotsCount(data.todayScreenshots || screenshotsList.length || 0);
 
       // Extract or generate weekly attendance
       if (data.weeklyAttendance && data.weeklyAttendance.length > 0) {

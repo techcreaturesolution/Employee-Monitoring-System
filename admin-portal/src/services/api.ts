@@ -51,7 +51,11 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('ems_token');
       localStorage.removeItem('ems_user');
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+      if (
+        window.location.pathname !== '/login' && 
+        window.location.pathname !== '/register' && 
+        window.location.pathname !== '/'
+      ) {
         window.location.href = '/login';
       }
     }
@@ -62,10 +66,13 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (data: Record<string, string>) => api.post('/auth/register', data),
   login: (data: { email: string; password: string }) => api.post('/auth/login', data),
+  logout: () => api.post('/auth/logout'),
   getMe: () => api.get('/auth/me'),
   updateProfile: (data: Record<string, string>) => api.put('/auth/profile', data),
   refreshToken: () => api.post('/auth/refresh-token'),
   changePassword: (data: Record<string, string>) => api.put('/auth/change-password', data),
+  forgotPassword: (data: { email: string }) => api.post('/auth/forgot-password', data),
+  resetPassword: (data: { token: string; newPassword: string }) => api.post('/auth/reset-password', data),
   uploadAvatar: (formData: FormData) => api.post('/auth/avatar', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
@@ -119,6 +126,7 @@ export const dashboardAPI = {
   getSuperAdmin: () => api.get('/dashboard/super-admin'),
   getCompany: () => api.get('/dashboard/company'),
   getManager: () => api.get('/dashboard/manager'),
+  getHr: () => api.get('/dashboard/hr'),
   getEmployee: () => api.get('/dashboard/employee'),
 };
 
@@ -183,6 +191,54 @@ export const reportAPI = {
   getScreenshots: (params?: Record<string, string>) => api.get('/reports/screenshots', { params }),
   exportPDF: (params?: Record<string, string>) => api.get('/reports/export/pdf', { responseType: 'blob', params }),
   exportExcel: (params?: Record<string, string>) => api.get('/reports/export/excel', { responseType: 'blob', params }),
+};
+
+export const departmentAPI = {
+  list: (params?: Record<string, string | number>) => api.get('/departments', { params }),
+  create: (data: Record<string, unknown>) => api.post('/departments', data),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/departments/${id}`, data),
+  delete: (id: string) => api.delete(`/departments/${id}`),
+};
+
+export const wfhAPI = {
+  apply: (data: Record<string, unknown>) => api.post('/wfh', data),
+  myRequests: (params?: Record<string, string | number>) => api.get('/wfh/my', { params }),
+  listAll: (params?: Record<string, string | number>) => api.get('/wfh', { params }),
+  approve: (id: string, data?: { notes?: string }) => api.put(`/wfh/${id}`, { ...data, status: 'approved' }),
+  reject: (id: string, data?: { notes?: string }) => api.put(`/wfh/${id}`, { ...data, status: 'rejected' }),
+};
+
+export const permissionsAPI = {
+  get: () => api.get('/permissions'),
+  update: (data: { role: string; module: string; actions: string[] }) => api.put('/permissions', data),
+};
+
+export const auditAPI = {
+  list: (params?: Record<string, string | number>) => api.get('/audit-logs', { params }),
+};
+
+export const companyAPI = {
+  getAnalytics: (params?: Record<string, string>) => api.get('/company/analytics', { params }),
+};
+
+export const subscriptionAPI = {
+  getStatus: () => api.get('/subscriptions/status'),
+  create: (data: { plan: string; billingCycle?: string }) => api.post('/subscriptions/create', data),
+};
+
+export const systemAPI = {
+  getHealth: () => api.get('/health', { baseURL: API_BASE.replace('/api', '') }), // Connect to root /health
+};
+
+export const managerAPI = {
+  list: (params?: Record<string, string | number>) => api.get('/managers', { params }),
+  create: (data: Record<string, unknown>) => api.post('/managers', data),
+  get: (id: string) => api.get(`/managers/${id}`),
+  update: (id: string, data: Record<string, unknown>) => api.put(`/managers/${id}`, data),
+  delete: (id: string) => api.delete(`/managers/${id}`),
+  assignTeam: (data: { managerId: string; employeeIds: string[] }) => api.post('/managers/assign-team', data),
+  getTeam: (id: string) => api.get(`/managers/team/${id}`),
+  getDashboard: () => api.get('/managers/dashboard'),
 };
 
 export default api;

@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Monitor, Building, User, Mail, Lock, Phone } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
-import { addAuditLog } from '../services/auditLogger';
 
 const Register: React.FC = () => {
   const [form, setForm] = useState({
@@ -27,12 +26,6 @@ const Register: React.FC = () => {
     try {
       await register(form);
       toast.success('Company registered successfully!');
-      addAuditLog({
-        action: 'Company Created',
-        details: `Company "${form.companyName}" registered successfully by admin "${form.name}"`,
-        severity: 'info',
-        actor: form.email
-      });
       navigate('/dashboard');
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } };

@@ -76,8 +76,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     try {
-      // In a real app we'd have a logout endpoint to clear the HTTP-only cookie
-      // await authAPI.logout(); 
+      await authAPI.logout(); 
     } catch (err) {
       // Ignore errors
     }

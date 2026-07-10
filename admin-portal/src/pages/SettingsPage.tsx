@@ -538,6 +538,108 @@ const SettingsPage: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Office Locations */}
+              <div className="mt-6 pt-4 border-t border-[#30363d]">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-sm font-bold text-slate-200">Office Geofence Locations</h4>
+                  <button
+                    type="button"
+                    onClick={() => setMonitoring({
+                      ...monitoring,
+                      officeLocations: [...monitoring.officeLocations, { name: '', latitude: 0, longitude: 0, radiusMeters: 100 }]
+                    })}
+                    className="flex items-center gap-1 text-xs bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 px-2 py-1 rounded"
+                  >
+                    <Plus className="w-3 h-3" /> Add Location
+                  </button>
+                </div>
+                
+                {monitoring.officeLocations.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic">No office locations defined. Geofencing will not work.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {monitoring.officeLocations.map((loc, idx) => (
+                      <div key={idx} className="bg-[#0d1117] border border-[#30363d] rounded-lg p-3">
+                        <div className="flex justify-between items-start mb-3">
+                          <h5 className="text-xs font-semibold text-slate-300">Location #{idx + 1}</h5>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newLocs = [...monitoring.officeLocations];
+                              newLocs.splice(idx, 1);
+                              setMonitoring({ ...monitoring, officeLocations: newLocs });
+                            }}
+                            className="text-slate-500 hover:text-red-400"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          <div>
+                            <label className="block text-[10px] text-slate-500 uppercase mb-1">Name</label>
+                            <input
+                              type="text"
+                              value={loc.name}
+                              onChange={(e) => {
+                                const newLocs = [...monitoring.officeLocations];
+                                newLocs[idx].name = e.target.value;
+                                setMonitoring({ ...monitoring, officeLocations: newLocs });
+                              }}
+                              className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1.5 text-xs text-white"
+                              placeholder="HQ Office"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-500 uppercase mb-1">Latitude</label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={loc.latitude}
+                              onChange={(e) => {
+                                const newLocs = [...monitoring.officeLocations];
+                                newLocs[idx].latitude = parseFloat(e.target.value) || 0;
+                                setMonitoring({ ...monitoring, officeLocations: newLocs });
+                              }}
+                              className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1.5 text-xs text-white"
+                              placeholder="0.0000"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-500 uppercase mb-1">Longitude</label>
+                            <input
+                              type="number"
+                              step="any"
+                              value={loc.longitude}
+                              onChange={(e) => {
+                                const newLocs = [...monitoring.officeLocations];
+                                newLocs[idx].longitude = parseFloat(e.target.value) || 0;
+                                setMonitoring({ ...monitoring, officeLocations: newLocs });
+                              }}
+                              className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1.5 text-xs text-white"
+                              placeholder="0.0000"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-500 uppercase mb-1">Radius (m)</label>
+                            <input
+                              type="number"
+                              value={loc.radiusMeters}
+                              onChange={(e) => {
+                                const newLocs = [...monitoring.officeLocations];
+                                newLocs[idx].radiusMeters = parseInt(e.target.value) || 100;
+                                setMonitoring({ ...monitoring, officeLocations: newLocs });
+                              }}
+                              className="w-full bg-[#161b22] border border-[#30363d] rounded px-2 py-1.5 text-xs text-white"
+                              placeholder="100"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

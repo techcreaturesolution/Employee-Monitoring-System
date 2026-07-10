@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SuperAdminPage from './SuperAdminPage';
-import { employeeAPI } from '../services/api';
+import { employeeAPI, managerAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 interface ManagerItem {
@@ -62,22 +62,25 @@ const Managers: React.FC = () => {
     }
     setLoading(true);
     try {
-      const res = await employeeAPI.list({ limit: 100 });
-      const allUsers = res.data.data.employees || [];
+      const [mgrRes, empRes] = await Promise.all([
+        managerAPI.list({ limit: 100 }),
+        employeeAPI.list({ limit: 100 })
+      ]);
+      const allManagers = mgrRes.data.data.managers || [];
+      const allEmployees = empRes.data.data.employees || [];
 
-      // Filter managers (role === 'manager')
-      const mgrList = allUsers.filter((u: any) => u.role === 'manager').map((u: any) => ({
+      // Map managers
+      const mgrList = allManagers.map((u: any) => ({
         id: u._id || u.id,
         name: u.name,
         email: u.email,
         department: u.department || 'Management',
-        // Calculate team size dynamically by counting employees in same department
-        teamSize: allUsers.filter((emp: any) => emp.role === 'employee' && emp.department === u.department).length,
+        teamSize: allEmployees.filter((emp: any) => emp.role === 'employee' && emp.department === u.department).length,
         status: u.status || 'active',
       }));
 
-      // Filter employees (role === 'employee')
-      const empList = allUsers.filter((u: any) => u.role === 'employee' || u.role === 'user').map((u: any) => {
+      // Filter employees
+      const empList = allEmployees.filter((u: any) => u.role === 'employee' || u.role === 'user').map((u: any) => {
         const deptManager = mgrList.find((m: any) => m.department === u.department);
         return {
           id: u._id || u.id,
@@ -111,10 +114,9 @@ const Managers: React.FC = () => {
       return;
     }
     try {
-      await employeeAPI.add({
+      await managerAPI.create({
         name: formName,
         email: formEmail,
-        role: 'manager',
         department: formDept,
         designation: 'Department Manager'
       });
@@ -142,9 +144,8 @@ const Managers: React.FC = () => {
     if (!emp || !mgr) return;
 
     try {
-      // Assign by updating department to manager's department
-      await employeeAPI.update(selectedEmployeeId, { department: mgr.department });
-      toast.success(`Assigned ${emp.name} to ${mgr.name}'s team (Department: ${mgr.department})!`);
+      await managerAPI.assignTeam({ managerId: selectedManagerId, employeeIds: [selectedEmployeeId] });
+      toast.success(`Assigned ${emp.name} to ${mgr.name}'s team!`);
       setSelectedEmployeeId('');
       setSelectedManagerId('');
       setSearchParams({ tab: 'list' });

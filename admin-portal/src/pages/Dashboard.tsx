@@ -5,6 +5,7 @@ import { DashboardStats, Screenshot, LeaveRequest } from '../types';
 import SuperAdminDashboard from './SuperAdminDashboard';
 import EmployeeDashboard from './EmployeeDashboard';
 import ManagerDashboard from './ManagerDashboard';
+import HRDashboard from './HRDashboard';
 import {
   Users,
   Wifi,
@@ -97,7 +98,8 @@ const Dashboard: React.FC = () => {
   const isAdmin =
     user?.role === 'company_admin' ||
     user?.role === 'super_admin' ||
-    user?.role === 'manager';
+    user?.role === 'manager' ||
+    user?.role === 'hr';
   const isSuperAdmin = user?.role === 'super_admin';
 
   // live clock
@@ -217,6 +219,10 @@ const Dashboard: React.FC = () => {
   /* ── Route to correct dashboard ── */
   if (isSuperAdmin) {
     return <SuperAdminDashboard />;
+  }
+
+  if (user?.role === 'hr') {
+    return <HRDashboard />;
   }
 
   if (user?.role === 'manager') {

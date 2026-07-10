@@ -27,7 +27,17 @@ import {
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import SuperAdminPage from './SuperAdminPage';
-import { getNotifications, NotificationItem as AdminNotificationItem } from '../services/notificationService';
+
+interface AdminNotificationItem {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  priority: string;
+  timestamp: string;
+  isRead: boolean;
+  isArchived: boolean;
+}
 
 // Employee Notification Type
 interface EmployeeNotificationItem {
